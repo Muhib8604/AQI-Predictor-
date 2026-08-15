@@ -1,4 +1,4 @@
-name: Hourly Feature Pipeline
+name: Training Pipeline
 
 on:
   schedule:
@@ -27,7 +27,7 @@ jobs:
           HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           AQICN_API_KEY: ${{ secrets.AQICN_API_KEY }}
-        run: python feature_pipeline.py
+        run: python training_pipeline.py
 
       - name: Commit updated local AQI history
         run: |
