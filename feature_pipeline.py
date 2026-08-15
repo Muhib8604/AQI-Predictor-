@@ -147,7 +147,10 @@ def main():
         print(df_row.dtypes)
         print()
         print(df_row)
-        fg.insert(df_row)
+        fg.insert(
+        df_row,
+        write_options={"wait_for_job": True}
+        )
         
         print(f"Inserted AQI={observed_aqi}")
 
