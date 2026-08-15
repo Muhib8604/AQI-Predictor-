@@ -1,0 +1,10 @@
+.venv311/
+__pycache__/
+*.pyc
+
+.vscode/
+mlruns/
+mlflow.db
+
+hops_certs/
+.env
