@@ -239,14 +239,18 @@ def main():
         # --------------------------------------------------------
         # Insert into Hopsworks
         # --------------------------------------------------------
+        # NOTE: no "start_offline_materialization": False here — that key
+        # was removed. It was a leftover workaround from before the real
+        # HDFS/deltalake fix; leaving it in would silently stop new hourly
+        # rows from ever reaching the OFFLINE store, which is the ONLY
+        # store training_pipeline.py and feature_snapshot.py read from.
+        # Every future row would exist online only and training would
+        # never see it again.
 
         fg.insert(
-        df_row,
-        write_options={
-        "wait_for_job": True,
-        "start_offline_materialization": False,   # skip HDFS/Delta write — write to online store only
-    },
-)
+            df_row,
+            write_options={"wait_for_job": True},
+        )
 
         print(
             f"Successfully inserted AQI={observed_aqi}"
