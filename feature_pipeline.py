@@ -22,6 +22,7 @@ import os
 import traceback
 from datetime import datetime, timezone
 import hopsworks
+import sys
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -158,7 +159,7 @@ def main():
     except Exception:
         print("\nFeature pipeline failed.\n")
         traceback.print_exc()
-        
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

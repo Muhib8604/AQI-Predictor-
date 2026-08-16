@@ -27,7 +27,7 @@ mlflow==3.3.2
 
 # ---------- Feature Store ----------
 hopsworks==5.0.4
-deltalake==1.6.2
+hops-deltalake
 pyarrow==21.0.0
 
 # ---------- Deep Learning ----------
