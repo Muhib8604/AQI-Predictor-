@@ -3,7 +3,7 @@ name: Hourly Feature Pipeline
 on:
   schedule:
     - cron: "0 * * * *"   # every hour, on the hour (UTC)
-  workflow_dispatch:        # lets you trigger it manually from the Actions tab
+  workflow_dispatch:        # allows manual trigger from the Actions tab
 
 jobs:
   run-feature-pipeline:
@@ -18,7 +18,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev krb5-user
+
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
       - name: Run hourly feature pipeline

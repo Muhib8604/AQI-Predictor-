@@ -27,7 +27,7 @@ mlflow==3.3.2
 
 # ---------- Feature Store ----------
 hopsworks==5.0.4
-hops-deltalake
+deltalake
 pyarrow==21.0.0
 
 # ---------- Deep Learning ----------
@@ -42,3 +42,4 @@ python-dotenv==1.1.1
 
 confluent-kafka
 statsmodels
+hsfs
