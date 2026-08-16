@@ -241,11 +241,12 @@ def main():
         # --------------------------------------------------------
 
         fg.insert(
-            df_row,
-            write_options={
-                "wait_for_job": True
-            },
-        )
+        df_row,
+        write_options={
+        "wait_for_job": True,
+        "start_offline_materialization": False,   # skip HDFS/Delta write — write to online store only
+    },
+)
 
         print(
             f"Successfully inserted AQI={observed_aqi}"
