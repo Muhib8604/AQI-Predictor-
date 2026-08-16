@@ -25,8 +25,8 @@ import sys
 import pandas as pd
 from feature_store import connect_feature_store
 
-POLLUTANTS_CSV = "historical_aqi_clean.csv"   # <-- rename to match your actual filename
-WEATHER_CSV = "historical_weather.csv"          # <-- rename to match your actual filename
+POLLUTANTS_CSV = "pollutants_historical.csv"   # <-- rename to match your actual filename
+WEATHER_CSV = "weather_historical.csv"          # <-- rename to match your actual filename
 
 FEATURE_GROUP_NAME = "aqi_features"
 FEATURE_GROUP_VERSION = 1
@@ -99,7 +99,17 @@ def build_backfill_rows(pollutants_df, weather_df):
 
         history.append(r["aqi"])  # only NOW does today's own aqi become part of history
 
-    return pd.DataFrame(rows)
+    result = pd.DataFrame(rows)
+
+    # Hopsworks expects these as whole numbers (bigint), but merging/reading
+    # CSVs can leave them as decimals (float/double) even when the values
+    # themselves are whole — round then cast explicitly so the schema check
+    # passes.
+    int_cols = ["pressure", "rain", "aqi_lag_1", "aqi_lag_2", "aqi_lag_3", "aqi_change", "aqi"]
+    for col in int_cols:
+        result[col] = result[col].round().astype("int64")
+
+    return result
 
 
 def main():
