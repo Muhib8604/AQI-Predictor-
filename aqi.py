@@ -1,37 +1,44 @@
-import requests
 import os
+import requests
 import pandas as pd
 from dotenv import load_dotenv
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 
 load_dotenv()
 
-#AQICN api key 
-def get_aqicn_data():
-
+# AQICN api key 
+def get_aqicn_data() -> dict | None:
     aqicn_api_key = os.getenv("AQICN_API_KEY")
+
+    if not aqicn_api_key:
+        print("Error: AQICN_API_KEY environment variable is missing.")
+        return None
 
     aqicn_url = f"https://api.waqi.info/feed/@545140/?token={aqicn_api_key}"
 
-    aqicn_response = requests.get(aqicn_url)
-
-    if aqicn_response.status_code != 200:
-        print("Error fetching AQICN data")
+    try:
+        aqicn_response = requests.get(aqicn_url, timeout=10)
+        aqicn_response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Error fetching AQICN data: {e}")
         return None
 
     aqicn_data = aqicn_response.json()
     
     if aqicn_data.get("status") != "ok":
-        print("AQICN API returned an error")
+        error_info = aqicn_data.get("data", "Unknown API error")
+        print(f"AQICN API returned an error status: {error_info}")
         return None
 
-    data = aqicn_data["data"]
+    data = aqicn_data.get("data", {})
     
-    print("Station:", data["city"]["name"])
-    print("AQI:", data["aqi"])
-    print(aqicn_data)
+    # Safely retrieve nested values using .get() to prevent KeyErrors
+    city_info = data.get("city", {})
+    station_name = city_info.get("name", "Unknown Station")
     aqi = data.get("aqi")
+
+    print("Station:", station_name)
+    print("AQI:", aqi)
 
     iaqi = data.get("iaqi", {})
 
@@ -44,11 +51,7 @@ def get_aqicn_data():
 
     timestamp = data.get("time", {}).get("iso")
 
-    city = data.get("city", {})
-
-    station_name = city.get("name")
-
-    clean_data = {
+    return {
         "station_id": "A545140",
         "station_name": station_name,
         "aqi": aqi,
@@ -59,8 +62,6 @@ def get_aqicn_data():
         "aqi_humidity": humidity,
         "timestamp": timestamp
     }
-
-    return clean_data
 
 if __name__ == "__main__":
     print(get_aqicn_data())
