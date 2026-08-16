@@ -365,22 +365,31 @@ ALERT_LOG_PATH = "alert_log.csv"
 def log_alert(forecast_date, predicted_aqi, threshold):
     """Append a hazard alert to the local log, skipping exact duplicates
     (same forecast_date + same predicted_aqi already logged)."""
+    predicted_aqi_rounded = round(float(predicted_aqi), 1)
+
     entry = pd.DataFrame([{
         "logged_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "forecast_date": forecast_date,
-        "predicted_aqi": round(float(predicted_aqi), 1),
+        "predicted_aqi": predicted_aqi_rounded,
         "threshold": threshold,
         "status": aqi_status(predicted_aqi)
     }])
 
     if os.path.exists(ALERT_LOG_PATH):
         existing = pd.read_csv(ALERT_LOG_PATH)
-        duplicate = (
+
+        # Force consistent types
+        if "predicted_aqi" in existing.columns:
+            existing["predicted_aqi"] = existing["predicted_aqi"].astype(float).round(1)
+
+        # Type-checker friendly way
+        matching = existing[
             (existing["forecast_date"] == forecast_date) &
-            (existing["predicted_aqi"] == entry.iloc[0]["predicted_aqi"])
-        ).any()
-        if duplicate:
+            (existing["predicted_aqi"] == predicted_aqi_rounded)
+        ]
+        if not matching.empty:
             return
+
         entry = pd.concat([existing, entry], ignore_index=True)
 
     entry.to_csv(ALERT_LOG_PATH, index=False)
@@ -462,7 +471,7 @@ f"Updated\n{datetime.now().strftime('%d %b %Y %H:%M')}"
 # 🏷️ HERO HEADER
 # ============================================================
 st.markdown(
-    f"""
+    """
     <span class="hero-title">🌍 Karachi Air Quality Prediction Dashboard</span>
     <span class="live-badge"><span class="pulse-dot"></span> LIVE</span>
     """,
