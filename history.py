@@ -17,7 +17,7 @@ def save_history(history):
 
     with open(HISTORY_FILE, "w") as file:
         json.dump(history, file, indent=4)
-
+    print("History updated successfully.")
 
 def update_history(today_aqi):
 

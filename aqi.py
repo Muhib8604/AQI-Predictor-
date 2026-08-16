@@ -12,7 +12,7 @@ def get_aqicn_data():
 
     aqicn_api_key = os.getenv("AQICN_API_KEY")
 
-    aqicn_url = f"https://api.waqi.info/feed/A545140/?token={aqicn_api_key}"
+    aqicn_url = f"https://api.waqi.info/feed/@545140/?token={aqicn_api_key}"
 
     aqicn_response = requests.get(aqicn_url)
 
@@ -27,7 +27,10 @@ def get_aqicn_data():
         return None
 
     data = aqicn_data["data"]
-
+    
+    print("Station:", data["city"]["name"])
+    print("AQI:", data["aqi"])
+    print(aqicn_data)
     aqi = data.get("aqi")
 
     iaqi = data.get("iaqi", {})
@@ -58,3 +61,6 @@ def get_aqicn_data():
     }
 
     return clean_data
+
+if __name__ == "__main__":
+    print(get_aqicn_data())

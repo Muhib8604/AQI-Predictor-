@@ -20,6 +20,7 @@ This directly satisfies:
 
 import os
 import traceback
+from training_pipeline import FEATURE_COLS
 from datetime import datetime, timezone
 import hopsworks
 import sys
@@ -118,7 +119,11 @@ def build_feature_row():
     # Keep the local lag/rolling history in sync with what we just observed
     if observed_aqi is not None:
         update_history(observed_aqi)
-
+    print(f"Observed AQI being saved: {observed_aqi}")
+    # Make sure every feature expected by the model exists
+    for col in FEATURE_COLS:
+     if col not in row:
+        row[col] = 0
     return row, observed_aqi, now
 
     

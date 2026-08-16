@@ -1,20 +1,28 @@
 {
   "day1": {
-    "model_type": "RandomForest",
-    "kind": "sklearn",
-    "file": "aqi_model_day1.pkl",
+    "model_type": "PyTorch",
+    "kind": "pytorch",
+    "file": "aqi_model_day1.pt",
+    "scaler_file": "aqi_scaler_day1.pkl",
+    "target_mean": 81.09087791495199,
+    "target_std": 35.02859917436558,
     "is_delta": false,
-    "mae": 8.592041652775722,
-    "r2": 0.8301707745631302,
+    "mae": 10.344149616343561,
+    "rmse": 12.846986726790105,
+    "r2": 0.8069748159858503,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day2": {
-    "model_type": "RandomForest",
-    "kind": "sklearn",
-    "file": "aqi_model_day2.pkl",
+    "model_type": "PyTorch",
+    "kind": "pytorch",
+    "file": "aqi_model_day2.pt",
+    "scaler_file": "aqi_scaler_day2.pkl",
+    "target_mean": -0.041523678792038436,
+    "target_std": 13.942400513691327,
     "is_delta": true,
-    "mae": 11.087048780351886,
-    "r2": 0.7318312086605294,
+    "mae": 13.418265338702486,
+    "rmse": 17.271574161650417,
+    "r2": 0.6523037152049362,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day3": {
@@ -22,8 +30,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day3.pkl",
     "is_delta": true,
-    "mae": 11.266243265950427,
-    "r2": 0.7135672549994234,
+    "mae": 14.749543119417137,
+    "rmse": 18.725589958527745,
+    "r2": 0.5915793638682848,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   }
 }

@@ -2,7 +2,7 @@ name: Training Pipeline
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour, on the hour (UTC)
+    - cron: "30 1 * * *"   # every hour, on the hour (UTC)
   workflow_dispatch:        # lets you trigger it manually from the Actions tab
 
 jobs:

@@ -64,7 +64,7 @@ def predict():
         })
 
     # Keep the local lag/rolling history in sync with today's day1 prediction
-    update_history(horizon_results["day1"]["predicted_aqi"])
+    #update_history(horizon_results["day1"]["predicted_aqi"])
 
     return {
         "3_day_AQI_forecast": predictions,
