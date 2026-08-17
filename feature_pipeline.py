@@ -15,7 +15,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from hsfs.feature import Feature
 
-from training_pipeline import FEATURE_COLS
 from weather import get_current_weather
 from aqi import get_aqicn_data
 from history import load_history, update_history
@@ -134,11 +133,6 @@ def build_feature_row() -> Tuple[Dict[str, Any], Optional[int], datetime]:
         update_history(observed_aqi)
 
     print(f"Observed AQI being saved: {observed_aqi}")
-
-    # Add any engineered features that are not yet present.
-    for col in FEATURE_COLS:
-        if col not in row:
-            row[col] = 0
 
     return row, observed_aqi, now
 
