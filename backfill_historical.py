@@ -29,7 +29,7 @@ POLLUTANTS_CSV = "historical_aqi_clean.csv"   # <-- rename to match your actual 
 WEATHER_CSV = "historical_weather.csv"          # <-- rename to match your actual filename
 
 FEATURE_GROUP_NAME = "aqi_features"
-FEATURE_GROUP_VERSION = 1
+FEATURE_GROUP_VERSION = 2
 
 
 def get_or_create_feature_group(fs):
