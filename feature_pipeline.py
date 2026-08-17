@@ -2,8 +2,6 @@
 feature_pipeline.py
 --------------------
 Runs HOURLY.
-Stores only basic + reliable features.
-Complex features are created later in training_pipeline.prepare_clean_dataset()
 """
 
 import os
@@ -15,7 +13,6 @@ from typing import Tuple, Optional, Dict, Any
 import hopsworks
 import pandas as pd
 from dotenv import load_dotenv
-from hsfs.feature import Feature
 
 from weather import get_current_weather
 from aqi import get_aqicn_data
@@ -24,7 +21,7 @@ from history import load_history, update_history
 load_dotenv()
 
 FEATURE_GROUP_NAME = "aqi_features"
-FEATURE_GROUP_VERSION = 2          # ← NEW VERSION (clean schema)
+FEATURE_GROUP_VERSION = 2
 
 BACKUP_PATH = os.getenv("FEATURE_BACKUP_PATH", "feature_backup.csv")
 
@@ -130,28 +127,16 @@ def main():
         fs = connect_feature_store()
         fg = get_or_create_feature_group(fs)
 
-        # Safety: append any missing columns (should be rare with v2)
-        existing = {f.name.lower() for f in fg.features}
-        to_append = []
-        for col in df_row.columns:
-            if col.lower() not in existing:
-                dtype = df_row[col].dtype
-                if pd.api.types.is_integer_dtype(dtype):
-                    hs_type = "bigint"
-                elif pd.api.types.is_float_dtype(dtype):
-                    hs_type = "double"
-                else:
-                    hs_type = "string"
-                to_append.append(Feature(name=col, type=hs_type))
-
-        if to_append:
-            print(f"Appending {len(to_append)} missing features...")
-            fg.append_features(to_append)
-
         print(df_row.dtypes)
         print(df_row)
 
-        fg.insert(df_row, write_options={"wait_for_job": True})
+        # Important: Do NOT call append_features on a brand new FG.
+        # First insert will create the schema automatically.
+        fg.insert(
+            df_row,
+            write_options={"wait_for_job": True},
+        )
+
         print(f"Successfully inserted AQI={observed_aqi}")
 
     except Exception:

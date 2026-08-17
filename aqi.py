@@ -7,8 +7,7 @@ load_dotenv()
 # Priority order — first successful station will be used
 AQICN_STATIONS = [
     "162592",     # Zafar Memon DHA
-    "A471613",    # Saddar Town (Clarity)
-    "1451",       # Karachi US Consulate (usually more stable)
+    "A471613",    # Saddar Town (Clarity)    
 ]
 
 
