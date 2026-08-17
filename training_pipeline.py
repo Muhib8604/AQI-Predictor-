@@ -354,7 +354,7 @@ def main():
     # Get the Feature Group
     feature_group = fs.get_feature_group(
         name="aqi_features",
-        version=1
+        version=2
     )
 
     # Read the data

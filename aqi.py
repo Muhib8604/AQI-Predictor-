@@ -1,88 +1,72 @@
 import os
 import requests
-import pandas as pd
 from dotenv import load_dotenv
-from datetime import datetime, timezone
 
 load_dotenv()
 
-# ============================================================
-# STATION ID — CHANGE THIS
-# ============================================================
-# @545140 = "NED University City Campus" — confirmed unreliable
-# (shows "no data" / stopped reporting on IQAir & AQICN's own map).
-# That's why "aqi" kept coming back as None even though the request
-# itself succeeded (no crash, just an empty reading).
-#
-# Go to https://aqicn.org/map/karachi/ , click a pin near Saddar that's
-# CURRENTLY showing a live number (not a dash), open its station page,
-# and copy the number from its URL (aqicn.org/station/@XXXXX). Put that
-# number below.
-AQICN_STATION_ID ="162592"  # <-- replace with the confirmed active station's ID
+# Priority order — first successful station will be used
+AQICN_STATIONS = [
+    "162592",     # Zafar Memon DHA
+    "A471613",    # Saddar Town (Clarity)
+    "1451",       # Karachi US Consulate (usually more stable)
+]
 
 
-def get_aqicn_data() -> dict | None:
+def get_aqicn_data(station_id: str = None) -> dict | None:
     aqicn_api_key = os.getenv("AQICN_API_KEY")
 
     if not aqicn_api_key:
         print("Error: AQICN_API_KEY environment variable is missing.")
         return None
 
-    aqicn_url = f"https://api.waqi.info/feed/@{AQICN_STATION_ID}/?token={aqicn_api_key}"
+    stations_to_try = [station_id] if station_id else AQICN_STATIONS
 
-    try:
-        aqicn_response = requests.get(aqicn_url, timeout=10)
-        aqicn_response.raise_for_status()
-    except requests.RequestException as e:
-        print(f"Error fetching AQICN data: {e}")
-        return None
+    for sid in stations_to_try:
+        # Remove @ if user accidentally put it
+        sid = str(sid).lstrip("@")
 
-    aqicn_data = aqicn_response.json()
+        url = f"https://api.waqi.info/feed/@{sid}/?token={aqicn_api_key}"
 
-    if aqicn_data.get("status") != "ok":
-        error_info = aqicn_data.get("data", "Unknown API error")
-        print(f"AQICN API returned an error status: {error_info}")
-        return None
+        try:
+            print(f"Trying AQICN station: {sid}")
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-    data = aqicn_data.get("data", {})
+            if data.get("status") != "ok":
+                print(f"  Station {sid} returned error status")
+                continue
 
-    # Safely retrieve nested values using .get() to prevent KeyErrors
-    city_info = data.get("city", {})
-    station_name = city_info.get("name", "Unknown Station")
-    aqi = data.get("aqi")
+            payload = data.get("data", {})
+            aqi = payload.get("aqi")
 
-    print("Station:", station_name)
-    print("AQI:", aqi)
+            if aqi is None:
+                print(f"  Station {sid} has no AQI value (offline?)")
+                continue
 
-    if aqi is None:
-        print(
-            "Warning: station returned no AQI value. It may be inactive "
-            "or temporarily offline — consider swapping AQICN_STATION_ID "
-            "above for a station that's currently reporting live data."
-        )
+            station_name = payload.get("city", {}).get("name", "Unknown Station")
+            print(f"  Success → Station: {station_name} | AQI: {aqi}")
 
-    iaqi = data.get("iaqi", {})
+            iaqi = payload.get("iaqi", {})
 
-    pm1 = iaqi.get("pm1", {}).get("v")
-    pm25 = iaqi.get("pm25", {}).get("v")
-    pm10 = iaqi.get("pm10", {}).get("v")
+            return {
+                "station_id": f"@{sid}",
+                "station_name": station_name,
+                "aqi": aqi,
+                "pm1": iaqi.get("pm1", {}).get("v"),
+                "pm25": iaqi.get("pm25", {}).get("v"),
+                "pm10": iaqi.get("pm10", {}).get("v"),
+                "aqi_temperature": iaqi.get("t", {}).get("v"),
+                "aqi_humidity": iaqi.get("h", {}).get("v"),
+                "timestamp": payload.get("time", {}).get("iso"),
+            }
 
-    humidity = iaqi.get("h", {}).get("v")
-    temperature = iaqi.get("t", {}).get("v")
+        except Exception as e:
+            print(f"  Station {sid} failed: {e}")
+            continue
 
-    timestamp = data.get("time", {}).get("iso")
-
-    return {
-        "station_id": f"A{AQICN_STATION_ID}",
-        "station_name": station_name,
-        "aqi": aqi,
-        "pm1": pm1,
-        "pm25": pm25,
-        "pm10": pm10,
-        "aqi_temperature": temperature,
-        "aqi_humidity": humidity,
-        "timestamp": timestamp
-    }
+    print("All AQICN stations failed or returned no AQI.")
+    return None
 
 
 if __name__ == "__main__":
