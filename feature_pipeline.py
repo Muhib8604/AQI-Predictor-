@@ -7,6 +7,7 @@ Runs HOURLY.
 import os
 import sys
 import traceback
+import numpy as np   
 from datetime import datetime, timezone
 from typing import Tuple, Optional, Dict, Any
 
@@ -53,16 +54,16 @@ def get_or_create_feature_group(fs):
     )
 
 
-def build_feature_row() -> Tuple[Dict[str, Any], Optional[int], datetime]:
+def build_feature_row() -> Tuple[Dict[str, Any], Optional[float], datetime]:
     weather_now = get_current_weather()
     if weather_now is None:
         raise RuntimeError("Could not fetch current weather from OpenWeather")
 
     aqicn = get_aqicn_data()
 
-    observed_aqi: Optional[int] = None
+    observed_aqi: Optional[float] = None
     if aqicn and aqicn.get("aqi") is not None:
-        observed_aqi = int(aqicn["aqi"])
+        observed_aqi = float(aqicn["aqi"])
 
     history = load_history()
 
@@ -103,7 +104,8 @@ def build_feature_row() -> Tuple[Dict[str, Any], Optional[int], datetime]:
         "aqi_rolling_mean_3": rolling_3,
         "aqi_change": aqi_change,
 
-        "aqi": observed_aqi,
+        # Important: use np.nan instead of None
+        "aqi": observed_aqi if observed_aqi is not None else np.nan,
     }
 
     if observed_aqi is not None:
@@ -117,7 +119,7 @@ def main():
     try:
         row, observed_aqi, _ = build_feature_row()
         df_row = pd.DataFrame([row])
-
+        df_row["aqi"] = df_row["aqi"].astype("float64")
         # Local backup
         if os.path.exists(BACKUP_PATH):
             df_row.to_csv(BACKUP_PATH, mode="a", header=False, index=False)
