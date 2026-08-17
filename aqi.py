@@ -18,7 +18,7 @@ load_dotenv()
 # CURRENTLY showing a live number (not a dash), open its station page,
 # and copy the number from its URL (aqicn.org/station/@XXXXX). Put that
 # number below.
-AQICN_STATION_ID = "162592"  # <-- replace with the confirmed active station's ID
+ # <-- replace with the confirmed active station's ID
 
 
 def get_aqicn_data() -> dict | None:
@@ -28,7 +28,7 @@ def get_aqicn_data() -> dict | None:
         print("Error: AQICN_API_KEY environment variable is missing.")
         return None
 
-    aqicn_url = f"https://api.waqi.info/feed/@{AQICN_STATION_ID}/?token={aqicn_api_key}"
+    aqicn_url = f"https://api.waqi.info/feed/@162592/?token={aqicn_api_key}"
 
     try:
         aqicn_response = requests.get(aqicn_url, timeout=10)
