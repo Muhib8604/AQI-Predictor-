@@ -2,41 +2,41 @@
 backfill_historical.py
 -----------------------
 ONE-TIME script. Merges your two historical CSVs (pollutants+aqi, and
-weather) and bulk-inserts them into the SAME Hopsworks feature group that
-feature_pipeline.py writes to hourly — so training_pipeline.py has real
-history to work with instead of waiting ~2 weeks for hourly rows to add up.
+weather) and bulk-inserts them into feature group v2 — the SAME one
+feature_pipeline.py writes to hourly and training_pipeline.py /
+feature_snapshot.py read from.
+
+WHY THIS IS SIMPLER THAN THE OLD VERSION: the old script carefully
+walked forward through time computing real aqi_lag_1/aqi_lag_2/aqi_lag_3/
+aqi_rolling_mean_3/aqi_change values, row by row. That turned out to be
+unnecessary — training_pipeline.py's prepare_clean_dataset() OVERWRITES
+these exact columns by recomputing them fresh from the raw "aqi" column
+every time it runs. Whatever values sit in the feature store for these 5
+columns are never actually read by anything downstream. So backfilled
+rows just fill them with 0.0 placeholders — the schema requires the
+columns to exist with a numeric value, but their content doesn't matter.
 
 Expects two files in this folder:
   pollutants_csv: date,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,aqi
   weather_csv:     date,temperature,humidity,pressure,wind_speed,rain
-
-Computes aqi_lag_1/2/3, aqi_rolling_mean_3, aqi_change the EXACT same way
-feature_pipeline.py's build_feature_row() does — walking forward through
-time, only ever using aqi values that happened BEFORE the current row —
-so backfilled rows are consistent with what real hourly rows would have
-looked like.
-
-Run this once, from wherever your writes currently work (GitHub Actions
-manual trigger, or WSL) — same requirement as feature_pipeline.py, since
-this also WRITES to Hopsworks.
 """
 
 import sys
 import pandas as pd
 from feature_store import connect_feature_store
 
-POLLUTANTS_CSV = "historical_aqi_clean.csv"   # <-- rename to match your actual filename
-WEATHER_CSV = "historical_weather.csv"          # <-- rename to match your actual filename
+POLLUTANTS_CSV = "pollutants_historical.csv"   # <-- rename to match your actual filename
+WEATHER_CSV = "weather_historical.csv"          # <-- rename to match your actual filename
 
 FEATURE_GROUP_NAME = "aqi_features"
-FEATURE_GROUP_VERSION = 2
+FEATURE_GROUP_VERSION = 2  # MUST MATCH feature_pipeline.py / training_pipeline.py / feature_snapshot.py
 
 
 def get_or_create_feature_group(fs):
     return fs.get_or_create_feature_group(
         name=FEATURE_GROUP_NAME,
         version=FEATURE_GROUP_VERSION,
-        description="Hourly weather + pollutant + engineered AQI features for Karachi",
+        description="Hourly basic weather + pollutant + simple AQI features for Karachi (v2)",
         primary_key=["date", "hour"],
         event_time="date",
         online_enabled=True,
@@ -56,15 +56,7 @@ def build_backfill_rows(pollutants_df, weather_df):
               f"weather row (or vice versa) and were skipped.")
 
     rows = []
-    history = []  # running list of past aqi values, oldest first — mirrors aqi_history.json
-
     for _, r in merged.iterrows():
-        lag_1 = history[-1] if len(history) >= 1 else 0
-        lag_2 = history[-2] if len(history) >= 2 else 0
-        lag_3 = history[-3] if len(history) >= 3 else 0
-        rolling_3 = (sum(history[-3:]) / 3) if len(history) >= 3 else lag_1
-        aqi_change = lag_1 - lag_2
-
         d = r["date"]
         rows.append({
             "date": d,
@@ -88,26 +80,26 @@ def build_backfill_rows(pollutants_df, weather_df):
             "sulphur_dioxide": r["sulphur_dioxide"],
             "ozone": r["ozone"],
 
-            "aqi_lag_1": lag_1,
-            "aqi_lag_2": lag_2,
-            "aqi_lag_3": lag_3,
-            "aqi_rolling_mean_3": rolling_3,
-            "aqi_change": aqi_change,
+            # Placeholders — never actually read downstream, see module docstring.
+            "aqi_lag_1": 0.0,
+            "aqi_lag_2": 0.0,
+            "aqi_lag_3": 0.0,
+            "aqi_rolling_mean_3": 0.0,
+            "aqi_change": 0.0,
 
             "aqi": r["aqi"],
         })
 
-        history.append(r["aqi"])  # only NOW does today's own aqi become part of history
-
     result = pd.DataFrame(rows)
 
-    # Hopsworks expects these as whole numbers (bigint), but merging/reading
-    # CSVs can leave them as decimals (float/double) even when the values
-    # themselves are whole — round then cast explicitly so the schema check
-    # passes.
-    int_cols = ["pressure", "rain", "aqi_lag_1", "aqi_lag_2", "aqi_lag_3", "aqi_change", "aqi"]
-    for col in int_cols:
-        result[col] = result[col].round().astype("int64")
+    # Match the live pipeline's dtypes as closely as possible. If Hopsworks
+    # still rejects the insert with a type-mismatch error on a specific
+    # column, that tells us its ACTUAL locked-in schema type for that
+    # column — flip int64 <-> float64 for just that column and retry.
+    result["pressure"] = result["pressure"].round().astype("int64")
+    result["rain"] = result["rain"].round().astype("int64")
+    for col in ["aqi_lag_1", "aqi_lag_2", "aqi_lag_3", "aqi_rolling_mean_3", "aqi_change", "aqi"]:
+        result[col] = result[col].astype("float64")
 
     return result
 

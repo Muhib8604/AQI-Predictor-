@@ -35,7 +35,12 @@ from weather import get_current_weather
 from training_pipeline import prepare_clean_dataset, FEATURE_COLS
 
 fs = connect_feature_store()
-feature_group = fs.get_feature_group(name="aqi_features", version=1)
+# VERSION MUST MATCH feature_pipeline.py, training_pipeline.py, and
+# backfill_historical.py — this was still hardcoded to v1 (the old,
+# schema-polluted feature group) while everything else moved to v2,
+# which is exactly why "unable to fetch aqi" was happening on the
+# dashboard — this function was reading empty/wrong data from v1.
+feature_group = fs.get_feature_group(name="aqi_features", version=2)
 
 
 def build_today_features():

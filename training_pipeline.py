@@ -361,9 +361,13 @@ def main():
 
     # Get the Feature Group
     # VERSION MUST MATCH feature_pipeline.py, feature_snapshot.py, and
-    # backfill_historical.py — v3 is the clean, raw-columns-only schema
-    # (no aqi_lag_*/rolling/ema/change columns stored — those are always
-    # recomputed here from the raw "aqi" column by prepare_clean_dataset()).
+    # backfill_historical.py — all four are synced on v2 (already live
+    # in Hopsworks, created via the earlier switch away from v1's messy
+    # schema). Note: prepare_clean_dataset() below recomputes ALL the
+    # lag/rolling/ema/change features itself from the raw "aqi" column —
+    # whatever aqi_lag_1/aqi_rolling_mean_3/aqi_change values are stored
+    # in the feature group are never read here, so their exact values
+    # (or being all-zero placeholders in backfilled rows) don't matter.
     feature_group = fs.get_feature_group(
         name="aqi_features",
         version=2
