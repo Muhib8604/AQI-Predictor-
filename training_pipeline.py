@@ -340,8 +340,16 @@ def run_tournament_for_horizon(daily_df, horizon_name, h, upstream_oof_level_by_
     print(f"  -> Champion for {horizon_name}: {champion_name} "
           f"(CV MAE={champion_data['mae']:.2f}, R2={champion_data['r2']:.3f})")
 
+    # Metrics-only view of every candidate (no model objects), for the
+    # dashboard's Model Comparison page — this is the only place all 3
+    # models' numbers survive; the manifest only keeps the champion.
+    all_candidate_metrics = {
+        name: {"mae": c["mae"], "rmse": c["rmse"], "r2": c["r2"]}
+        for name, c in candidates.items()
+    }
+
     oof_level_by_date = pd.Series(champion_data["oof"].values, index=df_h["date"].values)
-    return champion_name, champion_data, is_delta, oof_level_by_date
+    return champion_name, champion_data, is_delta, oof_level_by_date, all_candidate_metrics
 
 
 def main():
@@ -352,6 +360,10 @@ def main():
     fs = connect_feature_store()
 
     # Get the Feature Group
+    # VERSION MUST MATCH feature_pipeline.py, feature_snapshot.py, and
+    # backfill_historical.py — v3 is the clean, raw-columns-only schema
+    # (no aqi_lag_*/rolling/ema/change columns stored — those are always
+    # recomputed here from the raw "aqi" column by prepare_clean_dataset()).
     feature_group = fs.get_feature_group(
         name="aqi_features",
         version=2
@@ -365,13 +377,18 @@ def main():
 
     print(f"Training data source: Hopsworks Feature Store ({len(df)} daily rows)")
     manifest = {}
+    comparison = {}
     upstream_oof_level_by_date = None
 
     for horizon_name, h in [("day1", 1), ("day2", 2), ("day3", 3)]:
-        champ_name, champ_data, is_delta, oof_level_by_date = run_tournament_for_horizon(
+        champ_name, champ_data, is_delta, oof_level_by_date, all_candidate_metrics = run_tournament_for_horizon(
             df, horizon_name, h, upstream_oof_level_by_date
         )
         upstream_oof_level_by_date = oof_level_by_date
+        comparison[horizon_name] = {
+            "candidates": all_candidate_metrics,
+            "champion": champ_name,
+        }
 
         if champ_data["kind"] == "sklearn":
             file_name = f"aqi_model_{horizon_name}.pkl"
@@ -409,9 +426,11 @@ def main():
 
     with open("model_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
+    with open("model_comparison.json", "w") as f:
+        json.dump(comparison, f, indent=2)
     joblib.dump(FEATURE_COLS, "model_features.pkl")
 
-    print("\nSaved updated model_manifest.json and model_features.pkl.")
+    print("\nSaved updated model_manifest.json, model_comparison.json, and model_features.pkl.")
     print("\nFinal Lineup (Tournament Winners):")
     for h_name in ["day1", "day2", "day3"]:
         c = manifest[h_name]

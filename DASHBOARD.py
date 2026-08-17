@@ -260,6 +260,21 @@ section[data-testid="stSidebar"]{
     animation:pulse 1.6s infinite;
 }
 
+/* ---------- Live vs Predicted comparison card ---------- */
+.live-compare-card{
+    background:linear-gradient(160deg,#182840,#101c2e);
+    border-radius:18px;
+    padding:22px;
+    border:1px solid #2B3A4D;
+    margin:16px 0;
+}
+.live-compare-title{
+    font-size:1.05rem;
+    font-weight:700;
+    color:#93c5fd;
+    margin-bottom:6px;
+}
+
 .footer-chip{
     display:inline-block;
     background:rgba(255,255,255,.06);
@@ -550,7 +565,8 @@ st.markdown("""
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_forecast():
-    r = requests.get("http://127.0.0.1:8000/predict")
+    backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+    r = requests.get(f"{backend_url}/predict")
     return r.status_code, (r.json() if r.status_code == 200 else None)
 
 with st.spinner("Fetching latest AQI forecast..."):
@@ -596,6 +612,39 @@ elif status_code == 200 and payload and "3_day_AQI_forecast" in payload:
 
         for _, row in exceeded_days.iterrows():
             log_alert(row["date"].strftime("%Y-%m-%d"), row["predicted_aqi"], alert_threshold)
+
+    # ============================================================
+    # 🔴 LIVE vs 🔮 PREDICTED — compares the station's current live AQI
+    # reading against today's Day 1 model prediction. live_aqi comes
+    # from main.py's /predict response (via aqi.py / AQICN), independent
+    # of the forecast models — if the station is down this just shows
+    # "unavailable" instead of breaking the page.
+    # ============================================================
+    live_aqi = payload.get("live_aqi")
+    live_station_name = payload.get("live_station_name")
+
+    st.markdown('<div class="live-compare-card">', unsafe_allow_html=True)
+    st.markdown('<div class="live-compare-title">📡 Live Station Reading vs Model Prediction</div>', unsafe_allow_html=True)
+
+    lc1, lc2, lc3 = st.columns(3)
+
+    if live_aqi is not None:
+        lc1.metric(
+            f"🔴 Live AQI ({live_station_name or 'station'})",
+            f"{live_aqi:.0f}" if isinstance(live_aqi, (int, float)) else str(live_aqi),
+        )
+        lc2.metric("🔮 Predicted AQI (Day 1)", f"{latest:.1f}")
+        try:
+            diff = float(latest) - float(live_aqi)
+            lc3.metric("Δ Difference", f"{diff:+.1f}", help="Predicted minus live. Positive = model forecasting worse air than right now.")
+        except (TypeError, ValueError):
+            lc3.metric("Δ Difference", "N/A")
+    else:
+        lc1.warning("⚠️ Live station reading unavailable right now — the configured AQICN station may be temporarily offline.")
+        lc2.metric("🔮 Predicted AQI (Day 1)", f"{latest:.1f}")
+        lc3.write("")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -685,6 +734,19 @@ elif status_code == 200 and payload and "3_day_AQI_forecast" in payload:
             fillcolor="rgba(34,211,238,0.08)"
 
         )
+
+        # Overlay the live reading as a horizontal reference line, if available
+        if live_aqi is not None:
+            try:
+                fig.add_hline(
+                    y=float(live_aqi),
+                    line_dash="dash",
+                    line_color="#ef4444",
+                    annotation_text=f"Live: {float(live_aqi):.0f}",
+                    annotation_position="top left",
+                )
+            except (TypeError, ValueError):
+                pass
 
         st.plotly_chart(fig,use_container_width=True)
 

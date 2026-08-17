@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from weather import get_openweather_data
-from aqi import get_aqicn_data  # noqa: F401 (available for future use)
+from aqi import get_aqicn_data
 
 from history import update_history
 from feature_snapshot import build_today_features
@@ -66,7 +66,18 @@ def predict():
     # Keep the local lag/rolling history in sync with today's day1 prediction
     #update_history(horizon_results["day1"]["predicted_aqi"])
 
+    # ---- 5. Live station reading — shown alongside the forecast for
+    # comparison on the dashboard's home page. This is independent of the
+    # model's own prediction pipeline; if the station is temporarily down
+    # this just comes back as None and the dashboard shows "unavailable"
+    # instead of failing the whole /predict response. ----
+    live = get_aqicn_data()
+    live_aqi = live.get("aqi") if live else None
+    live_station_name = live.get("station_name") if live else None
+
     return {
         "3_day_AQI_forecast": predictions,
         "average_aqi": horizon_results["average_aqi"],
+        "live_aqi": live_aqi,
+        "live_station_name": live_station_name,
     }
