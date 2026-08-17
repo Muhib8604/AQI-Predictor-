@@ -40,7 +40,13 @@ fs = connect_feature_store()
 # schema-polluted feature group) while everything else moved to v2,
 # which is exactly why "unable to fetch aqi" was happening on the
 # dashboard — this function was reading empty/wrong data from v1.
-feature_group = fs.get_feature_group(name="aqi_features", version=2)
+FEATURE_GROUP_NAME = "aqi_features"
+FEATURE_GROUP_VERSION = 2
+
+feature_group = fs.get_feature_group(
+    name=FEATURE_GROUP_NAME,
+    version=FEATURE_GROUP_VERSION
+)
 
 
 def build_today_features():
@@ -56,11 +62,29 @@ def build_today_features():
     # the latest data actually saved to Hopsworks, even in a long-running
     # server process.
     history_df = feature_group.read()
+
     if history_df.empty:
         return None
 
+    history_df["aqi"] = pd.to_numeric(
+        history_df["aqi"],
+        errors="coerce"
+    )
+
+    known_aqi_df = (
+        history_df
+        .dropna(subset=["aqi"])
+        .sort_values(["date", "hour"])
+    )
+
+    if known_aqi_df.empty:
+        return None
+
     now = datetime.now(timezone.utc)
-    last_known_aqi = history_df.sort_values("date")["aqi"].iloc[-1]
+
+    last_known_aqi = float(
+        known_aqi_df["aqi"].iloc[-1]
+    )
 
     today_row = {
         "date": now.date(),

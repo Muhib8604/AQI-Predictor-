@@ -124,10 +124,6 @@ FEATURE_COLS = [
     "temperature_change_1", "humidity_change_1", "wind_speed_change_1", "pressure_change_1",
     "temperature_change_3", "humidity_change_3", "wind_speed_change_3", "pressure_change_3",
 ]
-# NOTE: "prev_aqi" is intentionally NOT in this list — it must never be a
-# model input (that would leak the true future value the model is being
-# asked to predict). It's only used inside run_tournament_for_horizon() to
-# correctly define the day2/day3 training TARGET, never as an X feature.
 
 
 def _pooled_metrics(actuals, preds):
@@ -155,7 +151,7 @@ def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delt
         param_grid,
         cv=TimeSeriesSplit(n_splits=N_SPLITS),
         scoring="neg_mean_absolute_error",
-        n_jobs=1,          # stops the warning spam
+        n_jobs=1,
         verbose=0,
     )
     search.fit(X, y_target)
@@ -286,14 +282,14 @@ def run_tournament_for_horizon(daily_df, horizon_name, h, upstream_oof_level_by_
         df_h["target"] = df_h["true_level"]
         is_delta = False
     else:
-        prev_actual = df_h["aqi"].shift(-(h - 1))  # TRUE value, used ONLY to define the correct target
+        prev_actual = df_h["aqi"].shift(-(h - 1))
         df_h["target"] = df_h["true_level"] - prev_actual
         is_delta = True
 
     df_h = df_h.dropna(subset=FEATURE_COLS + ["target", "true_level"]).reset_index(drop=True)
 
     if is_delta:
-        df_h["base_pred"] = df_h["date"].map(upstream_oof_level_by_date)  # PREDICTED, never actual
+        df_h["base_pred"] = df_h["date"].map(upstream_oof_level_by_date)
     else:
         df_h["base_pred"] = 0.0
 
@@ -340,9 +336,6 @@ def run_tournament_for_horizon(daily_df, horizon_name, h, upstream_oof_level_by_
     print(f"  -> Champion for {horizon_name}: {champion_name} "
           f"(CV MAE={champion_data['mae']:.2f}, R2={champion_data['r2']:.3f})")
 
-    # Metrics-only view of every candidate (no model objects), for the
-    # dashboard's Model Comparison page — this is the only place all 3
-    # models' numbers survive; the manifest only keeps the champion.
     all_candidate_metrics = {
         name: {"mae": c["mae"], "rmse": c["rmse"], "r2": c["r2"]}
         for name, c in candidates.items()
@@ -357,29 +350,46 @@ def main():
     mlflow.set_experiment("Karachi_AQI_Chained_Tournament")
 
     # Connect to Hopsworks
+    FEATURE_GROUP_NAME = "aqi_features"
+    FEATURE_GROUP_VERSION = 2
     fs = connect_feature_store()
 
-    # Get the Feature Group
-    # VERSION MUST MATCH feature_pipeline.py, feature_snapshot.py, and
-    # backfill_historical.py — all four are synced on v2 (already live
-    # in Hopsworks, created via the earlier switch away from v1's messy
-    # schema). Note: prepare_clean_dataset() below recomputes ALL the
-    # lag/rolling/ema/change features itself from the raw "aqi" column —
-    # whatever aqi_lag_1/aqi_rolling_mean_3/aqi_change values are stored
-    # in the feature group are never read here, so their exact values
-    # (or being all-zero placeholders in backfilled rows) don't matter.
     feature_group = fs.get_feature_group(
-        name="aqi_features",
-        version=2
+        name=FEATURE_GROUP_NAME,
+        version=FEATURE_GROUP_VERSION
     )
 
     # Read the data
     df_raw = feature_group.read()
 
-    # Prepare it for training
+    raw_row_count = len(df_raw)
+
+    print(
+        f"Raw rows read from Hopsworks V2: "
+        f"{raw_row_count}"
+    )
+
+    if raw_row_count < 23:
+        raise RuntimeError(
+            f"Not enough historical daily data. "
+            f"Need at least 23 raw daily rows for the "
+            f"3-day horizon with 5-fold CV. "
+            f"Found {raw_row_count} rows."
+        )
+
+    if not df_raw.empty:
+        print(
+            f"Raw date range: "
+            f"{df_raw['date'].min()} -> "
+            f"{df_raw['date'].max()}"
+        )
+
     df = prepare_clean_dataset(df_raw)
 
-    print(f"Training data source: Hopsworks Feature Store ({len(df)} daily rows)")
+    print(
+        f"Training data source: Hopsworks Feature Store V2 "
+        f"({len(df)} clean daily rows)"
+    )
     manifest = {}
     comparison = {}
     upstream_oof_level_by_date = None
@@ -412,7 +422,7 @@ def main():
                 "target_mean": champ_data["target_mean"],
                 "target_std":  champ_data["target_std"],
                 "is_delta": is_delta,
-                "mae": champ_data["mae"],"rmse": champ_data["rmse"], "r2": champ_data["r2"],
+                "mae": champ_data["mae"], "rmse": champ_data["rmse"], "r2": champ_data["r2"],
             }
 
         manifest[horizon_name]["evaluation"] = (
@@ -439,6 +449,7 @@ def main():
     for h_name in ["day1", "day2", "day3"]:
         c = manifest[h_name]
         print(f"  {h_name}: {c['model_type']} (MAE={c['mae']:.2f}, R2={c['r2']:.3f})")
+
 
 if __name__ == "__main__":
     main()

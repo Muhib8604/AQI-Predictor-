@@ -23,6 +23,7 @@ Expects two files in this folder:
 
 import sys
 import pandas as pd
+from feature_schema import align_to_hopsworks_schema
 from feature_store import connect_feature_store
 
 POLLUTANTS_CSV = "pollutants_historical.csv"   # <-- rename to match your actual filename
@@ -96,10 +97,7 @@ def build_backfill_rows(pollutants_df, weather_df):
     # still rejects the insert with a type-mismatch error on a specific
     # column, that tells us its ACTUAL locked-in schema type for that
     # column — flip int64 <-> float64 for just that column and retry.
-    result["pressure"] = result["pressure"].round().astype("int64")
-    result["rain"] = result["rain"].round().astype("int64")
-    for col in ["aqi_lag_1", "aqi_lag_2", "aqi_lag_3", "aqi_rolling_mean_3", "aqi_change", "aqi"]:
-        result[col] = result[col].astype("float64")
+    
 
     return result
 
@@ -113,18 +111,39 @@ def main():
         print(f"Check the POLLUTANTS_CSV / WEATHER_CSV filenames at the top of this script.")
         sys.exit(1)
 
-    backfill_df = build_backfill_rows(pollutants_df, weather_df)
-    print(f"Built {len(backfill_df)} historical rows spanning "
-          f"{backfill_df['date'].min()} to {backfill_df['date'].max()}")
+    backfill_df = build_backfill_rows(
+    pollutants_df,
+    weather_df
+)
 
-    fs = connect_feature_store()
-    fg = get_or_create_feature_group(fs)
+print(
+    f"Built {len(backfill_df)} historical rows spanning "
+    f"{backfill_df['date'].min()} to "
+    f"{backfill_df['date'].max()}"
+)
 
-    print("Uploading to Hopsworks (this is one bulk insert, not one-by-one)...")
-    fg.insert(backfill_df, write_options={"wait_for_job": True})
+fs = connect_feature_store()
+fg = get_or_create_feature_group(fs)
 
-    print(f"Backfill complete: inserted {len(backfill_df)} rows.")
+# Match the EXISTING V2 Hopsworks schema.
+backfill_df = align_to_hopsworks_schema(
+    backfill_df,
+    fg
+)
 
+print("\nBackfill dtypes:")
+print(backfill_df.dtypes)
+
+print("\nUploading to Hopsworks V2...")
+fg.insert(
+    backfill_df,
+    write_options={"wait_for_job": True}
+)
+
+print(
+    f"Backfill complete: inserted "
+    f"{len(backfill_df)} rows."
+)
 
 if __name__ == "__main__":
     main()

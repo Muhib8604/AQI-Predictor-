@@ -7,6 +7,7 @@ Runs HOURLY.
 import os
 import sys
 import traceback
+from feature_schema import align_to_hopsworks_schema
 import numpy as np   
 from datetime import datetime, timezone
 from typing import Tuple, Optional, Dict, Any
@@ -129,8 +130,14 @@ def main():
         fs = connect_feature_store()
         fg = get_or_create_feature_group(fs)
 
+        df_row = align_to_hopsworks_schema(df_row, fg)
+
+        print("Final dataframe dtypes:")
         print(df_row.dtypes)
+
+        print("\nFinal dataframe:")
         print(df_row)
+
 
         # Important: Do NOT call append_features on a brand new FG.
         # First insert will create the schema automatically.
