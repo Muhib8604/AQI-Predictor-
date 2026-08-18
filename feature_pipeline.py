@@ -138,13 +138,34 @@ def main():
         print("\nFinal dataframe:")
         print(df_row)
 
-
         # Important: Do NOT call append_features on a brand new FG.
         # First insert will create the schema automatically.
+        # Make sure AQI is populated BEFORE this point
+        df_row["aqi"] = pd.to_numeric(df_row["aqi"], errors="coerce")
+
+        for col in [
+            "aqi_lag_1",
+            "aqi_lag_2",
+            "aqi_lag_3",
+            "aqi_change",
+        ]:
+            df_row[col] = df_row[col].astype("int64")
+
+        df_row["aqi"] = df_row["aqi"].astype("float64")
+        df_row["aqi_rolling_mean_3"] = df_row["aqi_rolling_mean_3"].astype("float64")
+
+        print("\nData going into Hopsworks:")
+        print(df_row[["date", "hour", "aqi"]].tail())
+
         fg.insert(
             df_row,
-            write_options={"wait_for_job": True},
+            write_options={
+                "wait_for_job": True,
+                "wait_for_online_ingestion": True,
+            },
         )
+
+        print("Feature Group insert successful.")
 
         print(f"Successfully inserted AQI={observed_aqi}")
 

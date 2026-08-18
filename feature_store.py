@@ -13,11 +13,3 @@ def connect_feature_store():
     )
 
     return project.get_feature_store()
-
-if __name__ == "__main__":
-    print("Connecting to Hopsworks...")
-
-    fs = connect_feature_store()
-
-    print("Connected successfully!")
-    print(fs)
