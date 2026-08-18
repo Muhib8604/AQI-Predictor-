@@ -6,16 +6,6 @@ weather) and bulk-inserts them into feature group v2 — the SAME one
 feature_pipeline.py writes to hourly and training_pipeline.py /
 feature_snapshot.py read from.
 
-WHY THIS IS SIMPLER THAN THE OLD VERSION: the old script carefully
-walked forward through time computing real aqi_lag_1/aqi_lag_2/aqi_lag_3/
-aqi_rolling_mean_3/aqi_change values, row by row. That turned out to be
-unnecessary — training_pipeline.py's prepare_clean_dataset() OVERWRITES
-these exact columns by recomputing them fresh from the raw "aqi" column
-every time it runs. Whatever values sit in the feature store for these 5
-columns are never actually read by anything downstream. So backfilled
-rows just fill them with 0.0 placeholders — the schema requires the
-columns to exist with a numeric value, but their content doesn't matter.
-
 Expects two files in this folder:
   pollutants_csv: date,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,aqi
   weather_csv:     date,temperature,humidity,pressure,wind_speed,rain
@@ -61,7 +51,7 @@ def build_backfill_rows(pollutants_df, weather_df):
         d = r["date"]
         rows.append({
             "date": d,
-            "hour": 0,  # backfilled rows represent a daily snapshot; safe since these are past dates only
+            "hour": 0,
             "day": d.day,
             "month": d.month,
             "year": d.year,
@@ -81,7 +71,7 @@ def build_backfill_rows(pollutants_df, weather_df):
             "sulphur_dioxide": r["sulphur_dioxide"],
             "ozone": r["ozone"],
 
-            # Placeholders — never actually read downstream, see module docstring.
+            # Placeholders — training_pipeline recomputes these later
             "aqi_lag_1": 0.0,
             "aqi_lag_2": 0.0,
             "aqi_lag_3": 0.0,
@@ -91,15 +81,7 @@ def build_backfill_rows(pollutants_df, weather_df):
             "aqi": r["aqi"],
         })
 
-    result = pd.DataFrame(rows)
-
-    # Match the live pipeline's dtypes as closely as possible. If Hopsworks
-    # still rejects the insert with a type-mismatch error on a specific
-    # column, that tells us its ACTUAL locked-in schema type for that
-    # column — flip int64 <-> float64 for just that column and retry.
-    
-
-    return result
+    return pd.DataFrame(rows)
 
 
 def main():
@@ -108,42 +90,33 @@ def main():
         weather_df = pd.read_csv(WEATHER_CSV)
     except FileNotFoundError as e:
         print(f"Could not find a CSV file: {e}")
-        print(f"Check the POLLUTANTS_CSV / WEATHER_CSV filenames at the top of this script.")
+        print("Check the POLLUTANTS_CSV / WEATHER_CSV filenames at the top of this script.")
         sys.exit(1)
 
-    backfill_df = build_backfill_rows(
-    pollutants_df,
-    weather_df
-)
+    backfill_df = build_backfill_rows(pollutants_df, weather_df)
 
-print(
-    f"Built {len(backfill_df)} historical rows spanning "
-    f"{backfill_df['date'].min()} to "
-    f"{backfill_df['date'].max()}"
-)
+    print(
+        f"Built {len(backfill_df)} historical rows spanning "
+        f"{backfill_df['date'].min()} to {backfill_df['date'].max()}"
+    )
 
-fs = connect_feature_store()
-fg = get_or_create_feature_group(fs)
+    fs = connect_feature_store()
+    fg = get_or_create_feature_group(fs)
 
-# Match the EXISTING V2 Hopsworks schema.
-backfill_df = align_to_hopsworks_schema(
-    backfill_df,
-    fg
-)
+    # Match the EXISTING V2 Hopsworks schema
+    backfill_df = align_to_hopsworks_schema(backfill_df, fg)
 
-print("\nBackfill dtypes:")
-print(backfill_df.dtypes)
+    print("\nBackfill dtypes:")
+    print(backfill_df.dtypes)
 
-print("\nUploading to Hopsworks V2...")
-fg.insert(
-    backfill_df,
-    write_options={"wait_for_job": True}
-)
+    print("\nUploading to Hopsworks V2...")
+    fg.insert(
+        backfill_df,
+        write_options={"wait_for_job": True}
+    )
 
-print(
-    f"Backfill complete: inserted "
-    f"{len(backfill_df)} rows."
-)
+    print(f"Backfill complete: inserted {len(backfill_df)} rows.")
+
 
 if __name__ == "__main__":
     main()
