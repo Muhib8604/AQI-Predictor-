@@ -16,8 +16,8 @@ import pandas as pd
 from feature_schema import align_to_hopsworks_schema
 from feature_store import connect_feature_store
 
-POLLUTANTS_CSV = "pollutants_historical.csv"   # <-- rename to match your actual filename
-WEATHER_CSV = "weather_historical.csv"          # <-- rename to match your actual filename
+POLLUTANTS_CSV = "historical_aqi_clean.csv"   # <-- rename to match your actual filename
+WEATHER_CSV = "historical_weather.csv"          # <-- rename to match your actual filename
 
 FEATURE_GROUP_NAME = "aqi_features"
 FEATURE_GROUP_VERSION = 2  # MUST MATCH feature_pipeline.py / training_pipeline.py / feature_snapshot.py
