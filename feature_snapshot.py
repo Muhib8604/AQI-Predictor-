@@ -1,45 +1,19 @@
 """
 feature_snapshot.py
---------------------
-Single source of truth for building "today's" feature row — the exact input
-fed to all 3 per-day models (main.py's /predict route) AND used by the
-Explainability dashboard page to reconstruct what the model actually saw.
-
-WHY THIS VERSION IS DIFFERENT: earlier versions hand-built this row with
-their own copy of the lag/rolling/change formulas, and drifted out of sync
-with training_pipeline.py every time that file's feature set grew (that's
-what caused the "not in index" crash on the Explainability page). This
-version instead imports and calls prepare_clean_dataset() and FEATURE_COLS
-DIRECTLY from training_pipeline.py — the actual function training uses —
-so there is now only one place these formulas are ever written. If
-training_pipeline.py's feature set changes again in the future, this file
-does not need to change at all.
-
-HOW "TODAY" IS BUILT WITHOUT KNOWING TODAY'S OWN AQI:
-We append one placeholder row to the real historical data pulled from
-Hopsworks, using today's LIVE weather/pollutant reading. That placeholder
-row's own "aqi" value is a dummy (we don't know it yet — that's what we're
-forecasting) — but every column in FEATURE_COLS (aqi_lag_*, rolling means/
-stds, emas, changes) is built from aqi.shift(1) onward, i.e. strictly PAST
-days only, so the dummy value never actually reaches any FEATURE_COLS
-column. It exists purely so prepare_clean_dataset()'s final dropna() step
-doesn't discard this last row for lacking a same-day AQI we can't know yet.
 """
 
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
 
 from feature_store import connect_feature_store
 from weather import get_current_weather
+from aqi import get_aqicn_data
 from training_pipeline import prepare_clean_dataset, FEATURE_COLS
 
 fs = connect_feature_store()
-# VERSION MUST MATCH feature_pipeline.py, training_pipeline.py, and
-# backfill_historical.py — this was still hardcoded to v1 (the old,
-# schema-polluted feature group) while everything else moved to v2,
-# which is exactly why "unable to fetch aqi" was happening on the
-# dashboard — this function was reading empty/wrong data from v1.
+
 FEATURE_GROUP_NAME = "aqi_features"
 FEATURE_GROUP_VERSION = 2
 
@@ -50,26 +24,30 @@ feature_group = fs.get_feature_group(
 
 
 def build_today_features():
-    """Returns a dict with today's real feature values, computed by the
-    SAME function training_pipeline.py uses, or None if the live weather
-    API call failed or there isn't enough history yet."""
-
     current_weather = get_current_weather()
     if current_weather is None:
         return None
 
-    # Read fresh on every call (not once at import time) so this always reflects
-    # the latest data actually saved to Hopsworks, even in a long-running
-    # server process.
-    history_df = feature_group.read()
+    # ----------------------------------------------------------
+    # Retry Hopsworks read
+    # ----------------------------------------------------------
+    history_df = None
+    last_error = None
 
-    if history_df.empty:
+    for attempt in range(3):
+        try:
+            history_df = feature_group.read()
+            break
+        except Exception as e:
+            last_error = e
+            print(f"Hopsworks read failed (attempt {attempt + 1}/3): {e}")
+            time.sleep(2)
+
+    if history_df is None or history_df.empty:
+        print(f"Could not read feature group after retries: {last_error}")
         return None
 
-    history_df["aqi"] = pd.to_numeric(
-        history_df["aqi"],
-        errors="coerce"
-    )
+    history_df["aqi"] = pd.to_numeric(history_df["aqi"], errors="coerce")
 
     known_aqi_df = (
         history_df
@@ -80,11 +58,19 @@ def build_today_features():
     if known_aqi_df.empty:
         return None
 
-    now = datetime.now(timezone.utc)
+    # Prefer LIVE station AQI when available
+    live_aqi = None
+    try:
+        aqicn = get_aqicn_data()
+        if aqicn and aqicn.get("aqi") is not None:
+            live_aqi = float(aqicn["aqi"])
+            print(f"Using live AQICN AQI as latest reference: {live_aqi}")
+    except Exception as e:
+        print(f"Could not fetch live AQI for feature snapshot: {e}")
 
-    last_known_aqi = float(
-        known_aqi_df["aqi"].iloc[-1]
-    )
+    last_known_aqi = live_aqi if live_aqi is not None else float(known_aqi_df["aqi"].iloc[-1])
+
+    now = datetime.now(timezone.utc)
 
     today_row = {
         "date": now.date(),
@@ -99,18 +85,25 @@ def build_today_features():
         "nitrogen_dioxide": current_weather["nitrogen_dioxide"],
         "sulphur_dioxide": current_weather["sulphur_dioxide"],
         "ozone": current_weather["ozone"],
-        "aqi": last_known_aqi,  # dummy placeholder — see module docstring
+        "aqi": last_known_aqi,
     }
 
     combined_raw = pd.concat(
-        [history_df, pd.DataFrame([today_row])], ignore_index=True
+        [history_df, pd.DataFrame([today_row])],
+        ignore_index=True
     )
+
     engineered = prepare_clean_dataset(combined_raw)
 
     if engineered.empty:
-        # Not enough history yet (e.g. fewer than 14 days) for the longest
-        # lag/rolling features to have real values.
         return None
 
     today_engineered = engineered.iloc[-1]
-    return {col: today_engineered[col] for col in FEATURE_COLS}
+    features = {col: today_engineered[col] for col in FEATURE_COLS}
+
+    # Keep live AQI available for caller (main.py blend)
+    features["aqi"] = last_known_aqi
+    if live_aqi is not None:
+        features["live_aqi"] = live_aqi
+
+    return features

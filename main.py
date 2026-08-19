@@ -2,8 +2,6 @@ from fastapi import FastAPI
 
 from weather import get_openweather_data
 from aqi import get_aqicn_data
-
-from history import update_history
 from feature_snapshot import build_today_features
 from predict import predict_all_horizons
 
@@ -18,27 +16,51 @@ def home():
 @app.get("/predict")
 def predict():
 
-    # ---- 1. 3-day WEATHER FORECAST — used only to show each day's raw
-    # weather/pollutant readings in the dashboard cards, not fed to the models ----
+    # ---- 1. 3-day WEATHER FORECAST (display only) ----
     weather_forecast = get_openweather_data()
     if weather_forecast is None:
         return {"error": "Unable to fetch weather forecast"}
 
-    # ---- 2. TODAY's actual snapshot — this is what all 3 day-specific
-    # models are actually trained on and predict from. Built by
-    # feature_snapshot.py, the SAME function the Explainability dashboard
-    # page uses, so the two can never drift out of sync again. ----
+    # ---- 2. TODAY's feature snapshot (model input) ----
     today_features = build_today_features()
     if today_features is None:
-        return {"error": "Unable to fetch current weather"}
+        return {"error": "Unable to fetch current weather / features"}
 
-    # ---- 3. Run the 3 day-specific models on this SAME snapshot ----
+    # ---- 3. Run the 3 day-specific models ----
     try:
         horizon_results = predict_all_horizons(today_features)
     except RuntimeError as e:
         return {"error": str(e)}
 
-    # ---- 4. Merge each day's prediction with that day's DISPLAY weather ----
+    # ---- 4. Live station reading ----
+    live = get_aqicn_data()
+    live_aqi = None
+    live_station_name = None
+    if live and live.get("aqi") is not None:
+        try:
+            live_aqi = float(live["aqi"])
+            live_station_name = live.get("station_name")
+        except (TypeError, ValueError):
+            live_aqi = None
+
+    # ---- 5. Light blend for Day-1 (reduces large gap when live is much cleaner) ----
+    if live_aqi is not None:
+        model_day1 = float(horizon_results["day1"]["predicted_aqi"])
+        blended_day1 = 0.60 * model_day1 + 0.40 * live_aqi
+        print(
+            f"Day1 blend: model={model_day1:.1f}, live={live_aqi:.1f}, "
+            f"blended={blended_day1:.1f}"
+        )
+        horizon_results["day1"]["predicted_aqi"] = blended_day1
+
+        # Recompute average after blend
+        horizon_results["average_aqi"] = (
+            horizon_results["day1"]["predicted_aqi"]
+            + horizon_results["day2"]["predicted_aqi"]
+            + horizon_results["day3"]["predicted_aqi"]
+        ) / 3.0
+
+    # ---- 6. Merge predictions with display weather ----
     horizon_keys = ["day1", "day2", "day3"]
     predictions = []
 
@@ -62,18 +84,6 @@ def predict():
             "nitrogen_dioxide": day["nitrogen_dioxide"],
             "sulphur_dioxide": day["sulphur_dioxide"],
         })
-
-    # Keep the local lag/rolling history in sync with today's day1 prediction
-    #update_history(horizon_results["day1"]["predicted_aqi"])
-
-    # ---- 5. Live station reading — shown alongside the forecast for
-    # comparison on the dashboard's home page. This is independent of the
-    # model's own prediction pipeline; if the station is temporarily down
-    # this just comes back as None and the dashboard shows "unavailable"
-    # instead of failing the whole /predict response. ----
-    live = get_aqicn_data()
-    live_aqi = live.get("aqi") if live else None
-    live_station_name = live.get("station_name") if live else None
 
     return {
         "3_day_AQI_forecast": predictions,
