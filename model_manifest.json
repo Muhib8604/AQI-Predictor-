@@ -4,29 +4,29 @@
     "kind": "sklearn",
     "file": "aqi_model_day1.pkl",
     "is_delta": false,
-    "mae": 8.734731877436653,
-    "rmse": 12.679622245090581,
-    "r2": 0.8232589475490091,
+    "mae": 8.549937468284798,
+    "rmse": 12.560159037677066,
+    "r2": 0.8266575985483553,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day2": {
-    "model_type": "RandomForest",
+    "model_type": "Ridge",
     "kind": "sklearn",
     "file": "aqi_model_day2.pkl",
     "is_delta": true,
-    "mae": 15.118469546196144,
-    "rmse": 21.13268450125949,
-    "r2": 0.5080136334945148,
+    "mae": 13.714781872810994,
+    "rmse": 19.927523667734366,
+    "r2": 0.5627401407064758,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day3": {
-    "model_type": "RandomForest",
+    "model_type": "Ridge",
     "kind": "sklearn",
     "file": "aqi_model_day3.pkl",
     "is_delta": true,
-    "mae": 18.42563335084357,
-    "rmse": 24.377805821823312,
-    "r2": 0.3414964304847513,
+    "mae": 16.046555294961053,
+    "rmse": 22.56726390527092,
+    "r2": 0.43595372029923807,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   }
 }

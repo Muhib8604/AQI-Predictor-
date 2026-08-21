@@ -59,6 +59,15 @@ PYTORCH_PARAM_CANDIDATES = [
     {"epochs": 280, "lr": 0.0005, "weight_decay": 1e-4},
 ]
 
+
+def recency_weights(dates, half_life_days=75):
+    """
+    Recent rows get higher weight.
+    half_life_days=75 → ~2.5 months purani row ka weight ~0.5.
+    """
+    dates = pd.to_datetime(dates)
+    age_days = (dates.max() - dates).dt.days.astype(float)
+    return np.exp(-np.log(2) * age_days / half_life_days)
 # ============================================================
 # 1. FEATURE ENGINEERING
 # ============================================================
@@ -203,7 +212,7 @@ def _pooled_metrics(actuals, preds):
 # ============================================================
 # 2. MODEL TRAINERS
 # ============================================================
-def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delta):
+def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight):
     param_grid = {
         "n_estimators":     [200, 300],
         "max_depth":        [8, 12, None],
@@ -218,7 +227,7 @@ def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delt
         n_jobs=1,
         verbose=0,
     )
-    search.fit(X, y_target)
+    search.fit(X, y_target, sample_weight=sample_weight)
     best_rf = search.best_estimator_
 
     tscv = TimeSeriesSplit(n_splits=N_SPLITS)
@@ -226,7 +235,7 @@ def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delt
     pooled_actuals, pooled_preds = [], []
 
     for tr, te in tscv.split(X):
-        m = clone(best_rf).fit(X.iloc[tr], y_target.iloc[tr])
+        m = clone(best_rf).fit(X.iloc[tr], y_target.iloc[tr], sample_weight=sample_weight.iloc[tr])
         preds = m.predict(X.iloc[te])
         recon = (base_pred.iloc[te].values + preds) if is_delta else preds
         oof_level.iloc[te] = recon
@@ -236,11 +245,11 @@ def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delt
             pooled_preds.extend(np.asarray(recon)[valid])
 
     metrics = _pooled_metrics(pooled_actuals, pooled_preds)
-    final_model = clone(best_rf).fit(X, y_target)
+    final_model = clone(best_rf).fit(X, y_target, sample_weight=sample_weight)
     return final_model, metrics, oof_level
 
 
-def train_ridge(X, y_target, y_true_level, base_pred, eval_mask, is_delta):
+def train_ridge(X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight):
     pipe = Pipeline([("scaler", StandardScaler()), ("ridge", Ridge())])
     param_grid = {"ridge__alpha": [0.5, 1.0, 3.0, 10.0, 30.0, 100.0]}
     search = GridSearchCV(
@@ -250,7 +259,7 @@ def train_ridge(X, y_target, y_true_level, base_pred, eval_mask, is_delta):
         n_jobs=1,
         verbose=0,
     )
-    search.fit(X, y_target)
+    search.fit(X, y_target, **{"ridge__sample_weight": sample_weight})
     best_pipe = search.best_estimator_
 
     tscv = TimeSeriesSplit(n_splits=N_SPLITS)
@@ -258,7 +267,7 @@ def train_ridge(X, y_target, y_true_level, base_pred, eval_mask, is_delta):
     pooled_actuals, pooled_preds = [], []
 
     for tr, te in tscv.split(X):
-        m = clone(best_pipe).fit(X.iloc[tr], y_target.iloc[tr])
+        m = clone(best_pipe).fit(X.iloc[tr], y_target.iloc[tr], **{"ridge__sample_weight": sample_weight.iloc[tr]})
         preds = m.predict(X.iloc[te])
         recon = (base_pred.iloc[te].values + preds) if is_delta else preds
         oof_level.iloc[te] = recon
@@ -268,11 +277,11 @@ def train_ridge(X, y_target, y_true_level, base_pred, eval_mask, is_delta):
             pooled_preds.extend(np.asarray(recon)[valid])
 
     metrics = _pooled_metrics(pooled_actuals, pooled_preds)
-    final_model = clone(best_pipe).fit(X, y_target)
+    final_model = clone(best_pipe).fit(X, y_target, **{"ridge__sample_weight": sample_weight})
     return final_model, metrics, oof_level
 
 
-def _fit_pytorch_once(X_tr, y_tr, X_te, epochs, lr, weight_decay):
+def _fit_pytorch_once(X_tr, y_tr, X_te, epochs, lr, weight_decay, sample_weight=None):
     x_scaler = StandardScaler()
     X_tr_s = x_scaler.fit_transform(X_tr)
     X_te_s = x_scaler.transform(X_te)
@@ -283,17 +292,23 @@ def _fit_pytorch_once(X_tr, y_tr, X_te, epochs, lr, weight_decay):
 
     model = AQINet(X_tr.shape[1])
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    criterion = nn.HuberLoss(delta=1.0)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    criterion = nn.HuberLoss(delta=1.0, reduction="none")
+
+    if sample_weight is None:
+        w = torch.ones(len(y_tr), dtype=torch.float32)
+    else:
+        w = torch.tensor(np.asarray(sample_weight, dtype=np.float32))
+        w = w / (w.mean() + 1e-8)
 
     model.train()
     for _ in range(epochs):
         optimizer.zero_grad()
         out = model(torch.tensor(X_tr_s, dtype=torch.float32))
-        loss = criterion(out, torch.tensor(yt_tr_s, dtype=torch.float32).view(-1, 1))
+        target = torch.tensor(yt_tr_s, dtype=torch.float32).view(-1, 1)
+        per_sample = criterion(out, target).view(-1)
+        loss = (per_sample * w).mean()
         loss.backward()
         optimizer.step()
-        scheduler.step()
 
     model.eval()
     with torch.no_grad():
@@ -302,7 +317,7 @@ def _fit_pytorch_once(X_tr, y_tr, X_te, epochs, lr, weight_decay):
     return model, raw_preds, x_scaler, yt_m, yt_s
 
 
-def train_pytorch(X, y_target, y_true_level, base_pred, eval_mask, is_delta,
+def train_pytorch(X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight,
                   candidates=PYTORCH_PARAM_CANDIDATES):
     tscv = TimeSeriesSplit(n_splits=N_SPLITS)
     best = None
@@ -313,7 +328,7 @@ def train_pytorch(X, y_target, y_true_level, base_pred, eval_mask, is_delta,
 
         for tr, te in tscv.split(X):
             _, raw_preds, _, _, _ = _fit_pytorch_once(
-                X.iloc[tr], y_target.iloc[tr], X.iloc[te], **params
+                X.iloc[tr], y_target.iloc[tr], X.iloc[te], sample_weight=sample_weight.iloc[tr], **params
             )
             recon = (base_pred.iloc[te].values + raw_preds) if is_delta else raw_preds
             oof_level.iloc[te] = recon
@@ -327,7 +342,7 @@ def train_pytorch(X, y_target, y_true_level, base_pred, eval_mask, is_delta,
             best = {"params": params, "metrics": metrics, "oof_level": oof_level}
 
     final_model, _, x_scaler, yt_m, yt_s = _fit_pytorch_once(
-        X, y_target, X.tail(5), **best["params"]
+        X, y_target, X.tail(5), sample_weight=sample_weight, **best["params"]
     )
     return (final_model, x_scaler, yt_m, yt_s,
             best["metrics"], best["oof_level"], best["params"])
@@ -362,25 +377,31 @@ def run_tournament_for_horizon(daily_df, horizon_name, h, upstream_oof_level_by_
     print(f"  training rows (full): {len(df_h)}")
     if is_delta:
         print(f"  honest-eval rows (chained): {int(eval_mask.sum())}")
-
+    
+    sample_weight = pd.Series(
+        recency_weights(df_h["date"], half_life_days=75),
+        index=df_h.index,
+    )
+    print(f"  sample_weight: min={sample_weight.min():.3f} max={sample_weight.max():.3f} mean={sample_weight.mean():.3f}")
+    
     X            = df_h[FEATURE_COLS]
     y_target     = df_h["target"]
     y_true_level = df_h["true_level"]
     base_pred    = df_h["base_pred"]
 
     rf_m, rf_metrics, rf_oof = train_random_forest(
-        X, y_target, y_true_level, base_pred, eval_mask, is_delta
+        X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight
     )
     print(f"  RandomForest CV: MAE={rf_metrics['mae']:6.2f} | R2={rf_metrics['r2']:.3f}")
 
     ridge_m, ridge_metrics, ridge_oof = train_ridge(
-        X, y_target, y_true_level, base_pred, eval_mask, is_delta
+        X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight
     )
     print(f"  Ridge CV: MAE={ridge_metrics['mae']:6.2f} | R2={ridge_metrics['r2']:.3f}")
 
     (pt_m, pt_scaler, pt_m_val, pt_s_val,
      pt_metrics, pt_oof, pt_params) = train_pytorch(
-        X, y_target, y_true_level, base_pred, eval_mask, is_delta
+        X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight
     )
     print(f"  PyTorch CV: MAE={pt_metrics['mae']:6.2f} | R2={pt_metrics['r2']:.3f} params={pt_params}")
 
@@ -484,7 +505,7 @@ def main():
                 "model_type": champ_name, "kind": "pytorch",
                 "file": file_name, "scaler_file": scaler_name,
                 "target_mean": champ_data["target_mean"],
-                "target_std":  champ_data["target_std"],
+                "target_std":   champ_data["target_std"],
                 "is_delta": is_delta,
                 "mae": champ_data["mae"], "rmse": champ_data["rmse"], "r2": champ_data["r2"],
             }
