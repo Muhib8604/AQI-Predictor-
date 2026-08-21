@@ -5,7 +5,6 @@ UI polish only — same data contract with model_comparison.json / model_manifes
 
 import json
 import os
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -70,19 +69,6 @@ st.markdown(
     '<div class="page-sub">RandomForest vs Ridge vs PyTorch — cross-validated metrics per horizon</div>',
     unsafe_allow_html=True,
 )
-
-st.markdown('<div class="page-title">📈 Model comparison</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="page-sub">RandomForest vs Ridge vs PyTorch — cross-validated metrics per horizon</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown('<div class="page-title">📈 Model comparison</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="page-sub">RandomForest vs Ridge vs PyTorch — cross-validated metrics per horizon</div>',
-    unsafe_allow_html=True,
-)
-
 
 def load_json(path):
     if not os.path.exists(path):
