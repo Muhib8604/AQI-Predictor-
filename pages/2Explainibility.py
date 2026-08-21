@@ -37,7 +37,7 @@ html, body, [class*="css"] {
 .stApp {
     background: radial-gradient(1100px 520px at 12% -8%, #14241c 0%, #080a0d 42%, #080a0d 100%);
 }
-.block-container { padding-top: 1.6rem; padding-bottom: 2rem; }
+.block-container { padding-top: 3.5rem; padding-bottom: 2rem; }
 h1, h2, h3, h4 {
     font-family: 'Outfit', sans-serif !important;
     color: #f8fafc !important;
