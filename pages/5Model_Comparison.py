@@ -65,7 +65,7 @@ section[data-testid="stSidebar"] {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="page-title">Model comparison</div>', unsafe_allow_html=True)
+st.markdown('<div class="page-title">📈 Model comparison</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="page-sub">RandomForest vs Ridge vs PyTorch — cross-validated metrics per horizon</div>',
     unsafe_allow_html=True,
@@ -105,7 +105,7 @@ for horizon_name, horizon_data in comparison.items():
 df = pd.DataFrame(rows)
 
 st.markdown('<div class="section-label">Champions</div>', unsafe_allow_html=True)
-st.subheader("Champions")
+st.subheader("🏆 Champions")
 cols = st.columns(3)
 for col, horizon_name in zip(cols, ["day1", "day2", "day3"]):
     horizon_data = comparison.get(horizon_name, {})
@@ -119,7 +119,7 @@ for col, horizon_name in zip(cols, ["day1", "day2", "day3"]):
 
 st.markdown("---")
 st.markdown('<div class="section-label">MAE</div>', unsafe_allow_html=True)
-st.subheader("MAE by model (lower is better)")
+st.subheader("📉 MAE by model (lower is better)")
 fig_mae = px.bar(
     df, x="Horizon", y="MAE", color="Model", barmode="group", text_auto=".2f",
     color_discrete_sequence=["#34d399", "#6ee7b7", "#a7f3d0"],
@@ -134,7 +134,7 @@ fig_mae.update_layout(
 st.plotly_chart(fig_mae, use_container_width=True)
 
 st.markdown('<div class="section-label">R²</div>', unsafe_allow_html=True)
-st.subheader("R² by model (higher is better)")
+st.subheader("📈 R² by model (higher is better)")
 fig_r2 = px.bar(
     df, x="Horizon", y="R2", color="Model", barmode="group", text_auto=".3f",
     color_discrete_sequence=["#34d399", "#6ee7b7", "#a7f3d0"],
@@ -150,7 +150,7 @@ st.plotly_chart(fig_r2, use_container_width=True)
 
 st.markdown("---")
 st.markdown('<div class="section-label">Table</div>', unsafe_allow_html=True)
-st.subheader("Full comparison table")
+st.subheader("📋 Full comparison table")
 
 
 def highlight_champion(row):

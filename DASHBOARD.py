@@ -41,15 +41,24 @@ h1, h2, h3, h4 {
 
 .hero-title {
     font-family: 'Outfit', sans-serif;
-    font-size: clamp(1.6rem, 3vw, 2.15rem);
+    font-size: clamp(1.4rem, 4vw, 2.15rem);
     font-weight: 800;
     color: #f8fafc;
-    letter-spacing: -0.03em;
-    line-height: 1.2;
-    white-space: nowrap;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+    white-space: normal;
     overflow: visible;
     display: inline-block;
     max-width: 100%;
+    padding-bottom: 4px;
+}
+.hero-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 0.25rem;
+    margin-bottom: 0.35rem;
 }
 
 .live-badge {
@@ -318,13 +327,13 @@ def load_alert_log():
 # ============================================================
 # SIDEBAR
 # ============================================================
-st.sidebar.markdown("### Karachi AQI")
+st.sidebar.markdown("### 🌍 Karachi AQI")
 st.sidebar.caption("3-day forecast · live station · hazard alerts")
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Location**")
+st.sidebar.markdown("**📍 Location**")
 st.sidebar.success("Zafar Memon DHA, Karachi")
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Champion models**")
+st.sidebar.markdown("**🏆 Champion models**")
 if manifest:
     st.sidebar.write(f"Day 1 · {manifest['day1']['model_type']}")
     st.sidebar.write(f"Day 2 · {manifest['day2']['model_type']}")
@@ -333,14 +342,14 @@ else:
     st.sidebar.write("No model found")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Performance**")
+st.sidebar.markdown("**📈 Performance**")
 if manifest:
     st.sidebar.metric("Average R²", f"{avg_r2:.3f}")
     st.sidebar.metric("Average MAE", f"{avg_mae:.2f}")
     st.sidebar.metric("Average RMSE", f"{avg_rmse:.2f}")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Alert settings**")
+st.sidebar.markdown("**🚨 Alert settings**")
 alert_threshold = st.sidebar.slider(
     "Hazard threshold (AQI)",
     min_value=50, max_value=300, value=150, step=10,
@@ -349,7 +358,7 @@ alert_threshold = st.sidebar.slider(
 enable_toast_alert = st.sidebar.checkbox("Toast on alert", value=True)
 
 st.sidebar.markdown("---")
-if st.sidebar.button("Refresh forecast"):
+if st.sidebar.button("🔄 Refresh forecast"):
     st.cache_data.clear()
     st.rerun()
 
@@ -360,8 +369,8 @@ st.sidebar.caption(f"Updated {datetime.now().strftime('%d %b %Y %H:%M')}")
 # ============================================================
 st.markdown(
     """
-    <div style="padding-top:0.25rem; margin-bottom:0.35rem;">
-      <span class="hero-title">Karachi AQI Predictor</span>
+    <div class="hero-row">
+      <span class="hero-title">🌍 Karachi AQI Predictor</span>
       <span class="live-badge"><span class="pulse-dot"></span> LIVE</span>
     </div>
     """,
@@ -441,7 +450,7 @@ elif status_code == 200 and payload and "3_day_AQI_forecast" in payload:
         st.markdown(
             f"""
         <div class="alert-banner">
-        <b>Hazard alert</b> — {worst['date'].strftime('%d %b')} forecast AQI
+        <b>🚨 Hazard alert</b> — {worst['date'].strftime('%d %b')} forecast AQI
         <b>{worst['predicted_aqi']:.0f}</b> meets or exceeds threshold {alert_threshold}.
         Status: {aqi_status(worst['predicted_aqi'])}
         </div>
@@ -458,7 +467,7 @@ elif status_code == 200 and payload and "3_day_AQI_forecast" in payload:
 
     st.markdown('<div class="live-compare-card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="live-compare-title">Live station vs model prediction</div>',
+        '<div class="live-compare-title">📡 Live station vs model prediction</div>',
         unsafe_allow_html=True,
     )
     lc1, lc2, lc3 = st.columns(3)
@@ -541,7 +550,7 @@ elif status_code == 200 and payload and "3_day_AQI_forecast" in payload:
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("3-day forecast")
+    st.subheader("📅 3-day forecast")
     cols = st.columns(3)
     for i, day in enumerate(data):
         with cols[i]:
@@ -609,7 +618,7 @@ Ozone {day["ozone"]}<br>
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("Pollutant breakdown")
+    st.subheader("🧪 Pollutant breakdown")
     r1, r2 = st.columns([1.1, 1])
     with r1:
         latest_row = data[0]
@@ -656,7 +665,7 @@ Ozone {day["ozone"]}<br>
             )
 
     st.markdown("---")
-    st.subheader("Summary")
+    st.subheader("🧾 Summary")
     a, b, c, d = st.columns(4)
     a.metric("Average AQI", f"{df['predicted_aqi'].mean():.1f}")
     b.metric("Maximum AQI", f"{df['predicted_aqi'].max():.1f}")
@@ -664,11 +673,11 @@ Ozone {day["ozone"]}<br>
     d.metric("Backend average", f"{payload.get('average_aqi', df['predicted_aqi'].mean()):.1f}")
 
     st.markdown("---")
-    st.subheader("Location")
+    st.subheader("📍 Location")
     st.map(pd.DataFrame({"lat": [24.8050], "lon": [67.0450]}))
 
     st.markdown("---")
-    st.subheader("Forecast table")
+    st.subheader("📋 Forecast table")
     styled_df = df.style.background_gradient(subset=["predicted_aqi"], cmap="RdYlGn_r").format(precision=2)
     st.dataframe(styled_df, use_container_width=True)
     st.download_button(
@@ -679,7 +688,7 @@ Ozone {day["ozone"]}<br>
     )
 
     st.markdown("---")
-    st.subheader("Health guidance")
+    st.subheader("💡 Health guidance")
     if latest <= 50:
         st.success("Air quality is good. Outdoor activity is fine for most people.")
     elif latest <= 100:
@@ -690,7 +699,7 @@ Ozone {day["ozone"]}<br>
         st.error("Limit outdoor activity. Consider a mask if you must go outside.")
 
     st.markdown("---")
-    st.subheader("Alert history")
+    st.subheader("🕘 Alert history")
     alert_log = load_alert_log()
     if alert_log.empty:
         st.info("No hazard alerts logged yet.")
@@ -703,7 +712,7 @@ Ozone {day["ozone"]}<br>
             st.rerun()
 
     st.markdown("---")
-    st.subheader("Model information")
+    st.subheader("ℹ️ Model information")
     if manifest:
         st.write(
             f"""

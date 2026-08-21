@@ -86,7 +86,7 @@ hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="hero-title">Model explainability</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">🔬 Model explainability</div>', unsafe_allow_html=True)
 st.caption("SHAP · which features drive each day's AQI prediction")
 
 st.markdown("""
@@ -192,7 +192,7 @@ background_for_explainer = X_sample.sample(min(50, len(X_sample)), random_state=
 
 st.markdown("---")
 st.markdown('<div class="section-label">Global importance</div>', unsafe_allow_html=True)
-st.subheader("Global feature importance")
+st.subheader("🌐 Global feature importance")
 
 try:
     import shap
@@ -239,7 +239,7 @@ st.dataframe(mean_abs_shap, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 st.markdown('<div class="section-label">Local explanation</div>', unsafe_allow_html=True)
-st.subheader(f"Why this prediction? · {horizon_labels[selected_horizon]}")
+st.subheader(f"🧭 Why this prediction? · {horizon_labels[selected_horizon]}")
 
 try:
     from feature_snapshot import build_today_features

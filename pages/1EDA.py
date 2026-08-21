@@ -37,7 +37,7 @@ PLOT_LAYOUT = dict(
 )
 EMERALD = ["#34d399", "#6ee7b7", "#a7f3d0", "#10b981", "#059669", "#fbbf24", "#fb7185"]
 
-st.markdown('<div class="hero-title">Exploratory data analysis</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">📊 Exploratory data analysis</div>', unsafe_allow_html=True)
 st.caption("Training data deep-dive · interactive charts · Karachi AQI")
 
 st.markdown("---")
@@ -62,7 +62,7 @@ if df is None:
     st.stop()
 
 st.markdown('<div class="section-label">Overview</div>', unsafe_allow_html=True)
-st.subheader("Dataset overview")
+st.subheader("🗂️ Dataset overview")
 o1, o2, o3, o4 = st.columns(4)
 o1.metric("Rows", f"{df.shape[0]:,}")
 o2.metric("Columns", f"{df.shape[1]}")

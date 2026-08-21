@@ -28,55 +28,90 @@ html, body, [class*="css"] { font-family:'IBM Plex Sans',sans-serif; color:#e7ec
 .glow-card { background:linear-gradient(160deg,rgba(20,28,34,0.95),rgba(12,16,20,0.98)); border:1px solid rgba(52,211,153,0.22); border-radius:18px; padding:1.1rem; box-shadow:0 0 24px rgba(52,211,153,0.08); }
 .pill { display:inline-block; background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.28); color:#6ee7b7; padding:0.2rem 0.7rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
 .pill-warn { background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.3); color:#fbbf24; }
+/* Slider thumb: dark center, green ring (not a solid green dot) */
 div[data-baseweb="slider"] [role="slider"] {
-  background-color: #34d399 !important;
-  border-color: #34d399 !important;
+  background-color: #0b1310 !important;
+  border: 2px solid #34d399 !important;
+  box-shadow: 0 0 0 3px rgba(52,211,153,0.15) !important;
 }
+/* Slider filled track: outline only, transparent fill (no solid green bar) */
 div[data-testid="stSlider"] div[data-baseweb="slider"] > div > div {
-  background: #34d399 !important;
+  background: transparent !important;
+  border: 1.5px solid #34d399 !important;
+  border-radius: 999px !important;
+}
+/* Slider unfilled base track stays subtle/dark */
+div[data-testid="stSlider"] div[data-baseweb="slider"] > div {
+  background: rgba(255,255,255,0.06) !important;
 }
 div[data-testid="stMetric"] { background:rgba(14,18,22,0.85); border:1px solid rgba(52,211,153,0.16); border-radius:14px; padding:0.85rem 1rem; }
 .stButton > button { background:linear-gradient(90deg,#059669,#34d399)!important; color:#04140e!important; font-family:'Outfit',sans-serif!important; font-weight:700!important; border:none!important; border-radius:12px!important; box-shadow:0 8px 24px rgba(16,185,129,0.25); }
 </style>
 """, unsafe_allow_html=True)
 
-# UI-only station map (best-effort Karachi pins). Offline → Unavailable.
+# Karachi-area locations. Station AQI is resolved live via AQICN's geo
+# endpoint (nearest online station to a lat/lon), instead of hardcoded
+# station IDs — those IDs were invalid/mismatched, which is why every
+# area used to show "offline" regardless of which one you picked.
 LOCATIONS = {
-    "Zafar Memon DHA": {"lat": 24.8050, "lon": 67.0450, "station_id": "162592", "area": "DHA Phase 6"},
-    "Saddar": {"lat": 24.8607, "lon": 67.0011, "station_id": "A471613", "area": "Saddar Town"},
-    "Clifton": {"lat": 24.8138, "lon": 67.0267, "station_id": "162592", "area": "Clifton (nearest DHA feed)"},
-    "Gulshan-e-Iqbal": {"lat": 24.9056, "lon": 67.0822, "station_id": "A471613", "area": "Gulshan"},
-    "North Nazimabad": {"lat": 24.9420, "lon": 67.0450, "station_id": "162592", "area": "North Nazimabad"},
-    "Korangi": {"lat": 24.8500, "lon": 67.1500, "station_id": "A471613", "area": "Korangi"},
-    "Malir": {"lat": 24.8930, "lon": 67.1950, "station_id": "162592", "area": "Malir"},
-    "PECHS": {"lat": 24.8730, "lon": 67.0620, "station_id": "A471613", "area": "PECHS / Tariq Road"},
+    "Zafar Memon DHA": {"lat": 24.8050, "lon": 67.0450, "area": "DHA Phase 6"},
+    "Saddar": {"lat": 24.8607, "lon": 67.0011, "area": "Saddar Town"},
+    "Clifton": {"lat": 24.8138, "lon": 67.0267, "area": "Clifton"},
+    "Gulshan-e-Iqbal": {"lat": 24.9056, "lon": 67.0822, "area": "Gulshan"},
+    "North Nazimabad": {"lat": 24.9420, "lon": 67.0450, "area": "North Nazimabad"},
+    "Korangi": {"lat": 24.8500, "lon": 67.1500, "area": "Korangi"},
+    "Malir": {"lat": 24.8930, "lon": 67.1950, "area": "Malir"},
+    "PECHS": {"lat": 24.8730, "lon": 67.0620, "area": "PECHS / Tariq Road"},
 }
 
 
-def fetch_station_aqi(station_id: str):
-    """Page-local fetch only — does not modify project pipeline modules."""
+def _iaqi_value(iaqi: dict, key: str):
+    entry = iaqi.get(key)
+    return entry.get("v") if isinstance(entry, dict) else None
+
+
+def fetch_station_by_geo(lat: float, lon: float):
+    """Look up the nearest live AQICN station for a lat/lon pair.
+
+    Page-local fetch only — does not modify project pipeline modules.
+    Also returns individual pollutant/weather sub-readings (iaqi) so the
+    scenario sliders below can default to this station's real numbers.
+    """
     token = os.getenv("AQICN_API_KEY")
     if not token:
         return None, "Missing AQICN_API_KEY"
-    sid = str(station_id).lstrip("@")
-    url = f"https://api.waqi.info/feed/@{sid}/?token={token}"
+    url = f"https://api.waqi.info/feed/geo:{lat};{lon}/?token={token}"
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
         if data.get("status") != "ok":
-            return None, "Station error"
+            return None, "Station lookup failed"
         payload = data.get("data") or {}
         aqi = payload.get("aqi")
-        name = (payload.get("city") or {}).get("name", sid)
-        if aqi is None:
-            return None, "Station offline"
-        return {"aqi": float(aqi), "name": name}, None
+        if aqi is None or aqi == "-":
+            return None, "No live reading nearby"
+        iaqi = payload.get("iaqi") or {}
+        name = (payload.get("city") or {}).get("name", "Nearest station")
+        return {
+            "aqi": float(aqi),
+            "name": name,
+            "pm2_5": _iaqi_value(iaqi, "pm25"),
+            "pm10": _iaqi_value(iaqi, "pm10"),
+            "ozone": _iaqi_value(iaqi, "o3"),
+            "carbon_monoxide": _iaqi_value(iaqi, "co"),
+            "nitrogen_dioxide": _iaqi_value(iaqi, "no2"),
+            "sulphur_dioxide": _iaqi_value(iaqi, "so2"),
+            "temperature": _iaqi_value(iaqi, "t"),
+            "humidity": _iaqi_value(iaqi, "h"),
+            "pressure": _iaqi_value(iaqi, "p"),
+            "wind_speed": _iaqi_value(iaqi, "w"),
+        }, None
     except Exception as e:
         return None, str(e)
 
 
-st.markdown('<div class="page-title">Custom AQI Lab</div>', unsafe_allow_html=True)
+st.markdown('<div class="page-title">🧪 Custom AQI Lab</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="page-sub">Pick an area for live station reading + map. '
     'Scenario prediction still uses your existing model baseline (unchanged).</div>',
@@ -85,17 +120,17 @@ st.markdown(
 
 left, right = st.columns([1.15, 1])
 with left:
-    st.markdown('<div class="section-label">Location</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">📍 Location</div>', unsafe_allow_html=True)
     selected = st.selectbox("Area", list(LOCATIONS.keys()), index=0, label_visibility="collapsed")
     meta = LOCATIONS[selected]
 
-    live, err = fetch_station_aqi(meta["station_id"])
+    live, err = fetch_station_by_geo(meta["lat"], meta["lon"])
     if live:
         aqi_block = f'<div style="font-size:2rem;font-family:Outfit;font-weight:800;color:#34d399;">{live["aqi"]:.0f}</div><div style="color:#94a3b8;font-size:0.85rem;">Live AQI · {live["name"]}</div>'
-        pill = '<span class="pill">Station online</span>'
+        pill = '<span class="pill">🟢 Station online</span>'
     else:
         aqi_block = f'<div style="font-size:1.1rem;color:#fbbf24;">Unavailable</div><div style="color:#64748b;font-size:0.8rem;">{err or "No reading"}</div>'
-        pill = '<span class="pill pill-warn">Station offline / no data</span>'
+        pill = '<span class="pill pill-warn">⚠️ Station offline / no data</span>'
 
     st.markdown(
         f'<div class="glass" style="margin-top:0.6rem;">'
@@ -108,12 +143,15 @@ with left:
     )
 
 with right:
-    st.markdown('<div class="section-label">Map</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">🗺️ Map</div>', unsafe_allow_html=True)
     st.map(pd.DataFrame({"lat": [meta["lat"]], "lon": [meta["lon"]]}), zoom=12)
 
 st.markdown("---")
-st.markdown('<div class="section-label">Scenario controls</div>', unsafe_allow_html=True)
-st.caption("Sliders override weather/pollutants only. Lags stay from live baseline. No pipeline writes.")
+st.markdown('<div class="section-label">🎛️ Scenario controls</div>', unsafe_allow_html=True)
+st.caption(
+    "Sliders default to the selected area's live station reading (where available), "
+    "otherwise fall back to the model baseline. Lags stay from the baseline. No pipeline writes."
+)
 
 with st.spinner("Loading baseline…"):
     baseline = build_today_features()
@@ -121,37 +159,54 @@ if baseline is None:
     st.error("Baseline features unavailable (weather/Hopsworks). Scenario blocked.")
     st.stop()
 
+
+def default_for(key: str, fallback: float = 0.0) -> float:
+    """Prefer the selected area's live station reading; fall back to the model baseline."""
+    if live and live.get(key) is not None:
+        try:
+            return float(live[key])
+        except (TypeError, ValueError):
+            pass
+    try:
+        return float(baseline.get(key, fallback))
+    except (TypeError, ValueError):
+        return fallback
+
+
+# Widgets are keyed by `selected` so switching the area actually resets
+# each slider to that area's live numbers instead of keeping whatever
+# value was left over from the previous area.
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown('<div class="glow-card">', unsafe_allow_html=True)
     st.markdown("**Weather**")
-    temperature = st.slider("Temperature (°C)", 0.0, 50.0, float(baseline.get("temperature", 25.0)), 0.5)
-    humidity = st.slider("Humidity (%)", 0, 100, int(baseline.get("humidity", 50)))
-    pressure = st.slider("Pressure (hPa)", 950, 1050, int(baseline.get("pressure", 1010)))
+    temperature = st.slider("Temperature (°C)", 0.0, 50.0, default_for("temperature", 25.0), 0.5, key=f"temp_{selected}")
+    humidity = st.slider("Humidity (%)", 0, 100, int(default_for("humidity", 50)), key=f"hum_{selected}")
+    pressure = st.slider("Pressure (hPa)", 950, 1050, int(default_for("pressure", 1010)) or 1010, key=f"pres_{selected}")
     st.markdown("</div>", unsafe_allow_html=True)
 with c2:
     st.markdown('<div class="glow-card">', unsafe_allow_html=True)
     st.markdown("**Wind & rain**")
-    wind_speed = st.slider("Wind speed (m/s)", 0.0, 30.0, float(baseline.get("wind_speed", 5.0)), 0.5)
-    rain = st.slider("Rain (mm)", 0.0, 100.0, float(baseline.get("rain", 0.0)), 0.5)
+    wind_speed = st.slider("Wind speed (m/s)", 0.0, 30.0, default_for("wind_speed", 5.0), 0.5, key=f"wind_{selected}")
+    rain = st.slider("Rain (mm)", 0.0, 100.0, float(baseline.get("rain", 0.0)), 0.5, key=f"rain_{selected}")
     st.markdown("</div>", unsafe_allow_html=True)
 with c3:
     st.markdown('<div class="glow-card">', unsafe_allow_html=True)
     st.markdown("**Particulates**")
-    pm10 = st.slider("PM10 (µg/m³)", 0.0, 500.0, float(baseline.get("pm10", 80.0)), 1.0)
-    pm2_5 = st.slider("PM2.5 (µg/m³)", 0.0, 500.0, float(baseline.get("pm2_5", 40.0)), 1.0)
+    pm10 = st.slider("PM10 (µg/m³)", 0.0, 500.0, default_for("pm10", 80.0), 1.0, key=f"pm10_{selected}")
+    pm2_5 = st.slider("PM2.5 (µg/m³)", 0.0, 500.0, default_for("pm2_5", 40.0), 1.0, key=f"pm25_{selected}")
     st.markdown("</div>", unsafe_allow_html=True)
 
 c4, c5, c6 = st.columns(3)
 with c4:
-    carbon_monoxide = st.slider("CO (µg/m³)", 0.0, 3000.0, float(baseline.get("carbon_monoxide", 800.0)), 10.0)
+    carbon_monoxide = st.slider("CO (µg/m³)", 0.0, 3000.0, default_for("carbon_monoxide", 800.0), 10.0, key=f"co_{selected}")
 with c5:
-    nitrogen_dioxide = st.slider("NO₂ (µg/m³)", 0.0, 200.0, float(baseline.get("nitrogen_dioxide", 40.0)), 1.0)
+    nitrogen_dioxide = st.slider("NO₂ (µg/m³)", 0.0, 200.0, default_for("nitrogen_dioxide", 40.0), 1.0, key=f"no2_{selected}")
 with c6:
-    sulphur_dioxide = st.slider("SO₂ (µg/m³)", 0.0, 200.0, float(baseline.get("sulphur_dioxide", 30.0)), 1.0)
-    ozone = st.slider("Ozone (µg/m³)", 0.0, 300.0, float(baseline.get("ozone", 90.0)), 1.0)
+    sulphur_dioxide = st.slider("SO₂ (µg/m³)", 0.0, 200.0, default_for("sulphur_dioxide", 30.0), 1.0, key=f"so2_{selected}")
+    ozone = st.slider("Ozone (µg/m³)", 0.0, 300.0, default_for("ozone", 90.0), 1.0, key=f"o3_{selected}")
 
-if st.button("Run scenario prediction"):
+if st.button("▶️ Run scenario prediction"):
     feats = dict(baseline)
     feats.update({
         "temperature": temperature, "humidity": humidity, "pressure": pressure,
@@ -167,7 +222,7 @@ if st.button("Run scenario prediction"):
         st.stop()
 
     st.markdown("---")
-    st.markdown(f'<div class="section-label">Results · {selected}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-label">📊 Results · {selected}</div>', unsafe_allow_html=True)
     r1, r2, r3, r4 = st.columns(4)
     r1.metric("Day 1", f"{results['day1']['predicted_aqi']:.1f}", results["day1"]["model_used"])
     r2.metric("Day 2", f"{results['day2']['predicted_aqi']:.1f}", results["day2"]["model_used"])
