@@ -44,12 +44,25 @@ h1, h2, h3, h4 {
     letter-spacing: -0.02em;
 }
 .hero-title {
-    font-family: 'Outfit', sans-serif;
-    font-size: 2.2rem;
-    font-weight: 800;
-    color: #f8fafc;
-    letter-spacing: -0.03em;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: clamp(1.5rem, 3.2vw, 2.05rem) !important;
+    font-weight: 800 !important;
+    color: #f8fafc !important;
+    letter-spacing: -0.02em;
+    line-height: 1.5 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    display: inline-block !important;
+    max-width: 100%;
+    padding-top: 6px !important;
+    padding-bottom: 8px !important;
+    /* agar gradient text use ho raha ho to clip avoid */
+    -webkit-background-clip: unset !important;
+    background-clip: unset !important;
+    -webkit-text-fill-color: #f8fafc !important;
 }
+
 [data-testid="stMetric"] {
     background: rgba(14, 18, 22, 0.88);
     border: 1px solid rgba(52, 211, 153, 0.16);
