@@ -94,13 +94,47 @@ with tab1:
     st.subheader("AQI distribution")
     t1, t2 = st.columns(2)
     with t1:
-        fig = px.histogram(df, x="aqi", nbins=30, color_discrete_sequence=["#34d399"])
-        fig.update_layout(**PLOT_LAYOUT, title="AQI histogram")
+        fig = go.Figure()
+        fig.add_trace(
+            go.Histogram(
+                x=df["aqi"],
+                nbinsx=30,
+                marker=dict(
+                    color="rgba(0,0,0,0)",
+                    line=dict(
+                        color="#34d399",
+                        width=2
+                    )
+                ),
+                opacity=1
+            )
+        )
+        fig.update_layout(
+            **PLOT_LAYOUT,
+            title="AQI histogram",
+            bargap=0.04
+        )
         st.plotly_chart(fig, use_container_width=True)
+        
     with t2:
-        fig = px.box(df, y="aqi", color_discrete_sequence=["#6ee7b7"])
+        fig = go.Figure()
+        fig.add_trace(
+            go.Box(
+                y=df["aqi"],
+                name="AQI",
+                fillcolor="rgba(0,0,0,0)",
+                line=dict(
+                    color="#34d399",
+                    width=2
+                ),
+                marker=dict(
+                    color="#34d399"
+                )
+            )
+        )
         fig.update_layout(**PLOT_LAYOUT, title="AQI boxplot")
         st.plotly_chart(fig, use_container_width=True)
+        
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Mean", f"{df['aqi'].mean():.1f}")
     c2.metric("Median", f"{df['aqi'].median():.1f}")
@@ -113,15 +147,33 @@ with tab2:
     grid = st.columns(2)
     for i, feature in enumerate(features):
         with grid[i % 2]:
-            fig = px.histogram(df, x=feature, nbins=30, color_discrete_sequence=[EMERALD[i % len(EMERALD)]])
-            fig.update_layout(**PLOT_LAYOUT, title=feature)
+            fig = go.Figure()
+            fig.add_trace(
+                go.Histogram(
+                    x=df[feature],
+                    nbinsx=30,
+                    marker=dict(
+                        color="rgba(0,0,0,0)",
+                        line=dict(
+                            color="#34d399",
+                            width=2
+                        )
+                    ),
+                    opacity=1
+                )
+            )
+            fig.update_layout(
+                **PLOT_LAYOUT,
+                title=feature,
+                bargap=0.04
+            )
             st.plotly_chart(fig, use_container_width=True)
 
 with tab3:
     st.subheader("Correlation heatmap")
     corr = df.corr(numeric_only=True)
     fig = px.imshow(
-        corr, color_continuous_scale=["#080a0d", "#064e3b", "#34d399", "#fbbf24"],
+        corr, color_continuous_scale=["#080a0d", "#064e3b", "#34d399", "#34d399"],
         aspect="auto", labels=dict(color="ρ"),
     )
     fig.update_layout(**PLOT_LAYOUT, height=640, title="Correlation matrix")
@@ -152,8 +204,22 @@ with tab5:
         st.subheader("AQI over time")
         df_time = df.copy()
         df_time["date"] = pd.to_datetime(df_time["date"])
-        fig = px.line(df_time, x="date", y="aqi", color_discrete_sequence=["#34d399"])
-        fig.update_layout(**PLOT_LAYOUT, title="AQI over time")
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=df_time["date"],
+                y=df_time["aqi"],
+                mode="lines",
+                line=dict(
+                    color="#34d399",
+                    width=2
+                )
+            )
+        )
+        fig.update_layout(
+            **PLOT_LAYOUT,
+            title="AQI over time"
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No `date` column — time series skipped.")
@@ -161,8 +227,30 @@ with tab5:
     st.subheader("Outlier view")
     outlier_cols = [c for c in ["temperature", "humidity", "pm2_5", "pm10", "aqi"] if c in df.columns]
     melted = df[outlier_cols].melt(var_name="Feature", value_name="Value")
-    fig = px.box(melted, x="Feature", y="Value", color="Feature", color_discrete_sequence=EMERALD)
-    fig.update_layout(**PLOT_LAYOUT, title="Outlier detection", showlegend=False)
+    fig = go.Figure()
+
+    for feature in melted["Feature"].unique():
+        values = melted.loc[melted["Feature"] == feature, "Value"]
+        fig.add_trace(
+            go.Box(
+                y=values,
+                name=feature,
+                fillcolor="rgba(0,0,0,0)",
+                line=dict(
+                    color="#34d399",
+                    width=2
+                ),
+                marker=dict(
+                    color="#34d399"
+                )
+            )
+        )
+
+    fig.update_layout(
+        **PLOT_LAYOUT,
+        title="Outlier detection",
+        showlegend=False
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")

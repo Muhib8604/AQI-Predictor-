@@ -63,49 +63,113 @@ PYTORCH_PARAM_CANDIDATES = [
 # 1. FEATURE ENGINEERING
 # ============================================================
 def prepare_clean_dataset(df_raw):
+
+    # Make a working copy BEFORE using df
     df = df_raw.copy()
+
+    print("\n===== AQI DISTRIBUTION =====")
+    print(df["aqi"].describe())
+
+    print("\n===== AQI RANGES =====")
+    print("AQI < 20:", (df["aqi"] < 20).sum())
+    print("AQI 20-40:", ((df["aqi"] >= 20) & (df["aqi"] < 40)).sum())
+    print("AQI 40-60:", ((df["aqi"] >= 40) & (df["aqi"] < 60)).sum())
+    print("AQI 60-80:", ((df["aqi"] >= 60) & (df["aqi"] < 80)).sum())
+    print("AQI 80-100:", ((df["aqi"] >= 80) & (df["aqi"] < 100)).sum())
+    print("AQI 100+:", (df["aqi"] >= 100).sum())
+    print("============================\n")
+
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").set_index("date")
-    df = df.resample("D").mean(numeric_only=True).interpolate(method="time")
+
+    # Daily aggregation
+    df = df.resample("D").mean(numeric_only=True)
+
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # Never interpolate AQI.
+    # AQI must come from an actual station observation.
+    # --------------------------------------------------------
+    df = df.dropna(subset=["aqi"])
+
+    # Interpolate/fill only non-target features
+    feature_fill_cols = [
+        "temperature",
+        "humidity",
+        "pressure",
+        "wind_speed",
+        "rain",
+        "pm10",
+        "pm2_5",
+        "carbon_monoxide",
+        "nitrogen_dioxide",
+        "sulphur_dioxide",
+        "ozone",
+    ]
+
+    for col in feature_fill_cols:
+        if col in df.columns:
+            df[col] = df[col].interpolate(method="time")
+            df[col] = df[col].ffill().bfill()
+
     df = df.reset_index()
 
-    df["month"]       = df["date"].dt.month
-    df["day"]         = df["date"].dt.day
+    # --------------------------------------------------------
+    # Calendar features
+    # --------------------------------------------------------
+    df["month"] = df["date"].dt.month
+    df["day"] = df["date"].dt.day
     df["day_of_week"] = df["date"].dt.dayofweek
-    df["is_weekend"]  = (df["day_of_week"] >= 5).astype(int)
-    df["month_sin"]   = np.sin(2 * np.pi * df["month"] / 12)
-    df["month_cos"]   = np.cos(2 * np.pi * df["month"] / 12)
-    df["dow_sin"]     = np.sin(2 * np.pi * df["day_of_week"] / 7)
-    df["dow_cos"]     = np.cos(2 * np.pi * df["day_of_week"] / 7)
+    df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
 
+    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+
+    df["dow_sin"] = np.sin(2 * np.pi * df["day_of_week"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["day_of_week"] / 7)
+
+    # --------------------------------------------------------
+    # AQI lag features
+    # --------------------------------------------------------
     for lag in [1, 2, 3, 5, 7, 14]:
         df[f"aqi_lag_{lag}"] = df["aqi"].shift(lag)
 
     aqi_lag1 = df["aqi"].shift(1)
-    df["aqi_rolling_mean_3"]  = aqi_lag1.rolling(3).mean()
-    df["aqi_rolling_std_3"]   = aqi_lag1.rolling(3).std()
-    df["aqi_rolling_mean_7"]  = aqi_lag1.rolling(7).mean()
-    df["aqi_rolling_std_7"]   = aqi_lag1.rolling(7).std()
+
+    df["aqi_rolling_mean_3"] = aqi_lag1.rolling(3).mean()
+    df["aqi_rolling_std_3"] = aqi_lag1.rolling(3).std()
+
+    df["aqi_rolling_mean_7"] = aqi_lag1.rolling(7).mean()
+    df["aqi_rolling_std_7"] = aqi_lag1.rolling(7).std()
+
     df["aqi_rolling_mean_14"] = aqi_lag1.rolling(14).mean()
-    df["aqi_rolling_std_14"]  = aqi_lag1.rolling(14).std()
+    df["aqi_rolling_std_14"] = aqi_lag1.rolling(14).std()
 
     df["aqi_ema_3"] = aqi_lag1.ewm(span=3, adjust=False).mean()
     df["aqi_ema_7"] = aqi_lag1.ewm(span=7, adjust=False).mean()
 
-    df["aqi_change"]   = df["aqi_lag_1"] - df["aqi_lag_2"]
+    df["aqi_change"] = df["aqi_lag_1"] - df["aqi_lag_2"]
     df["aqi_change_3"] = df["aqi_lag_1"] - df["aqi_lag_3"]
     df["aqi_change_7"] = df["aqi_lag_1"] - df["aqi_lag_7"]
 
+    # --------------------------------------------------------
+    # Pollutant lag/change features
+    # --------------------------------------------------------
     for col in ["pm2_5", "pm10", "ozone", "nitrogen_dioxide"]:
-        df[f"{col}_lag_1"]    = df[col].shift(1)
+        df[f"{col}_lag_1"] = df[col].shift(1)
         df[f"{col}_change_1"] = df[col] - df[col].shift(1)
 
+    # --------------------------------------------------------
+    # Weather change features
+    # --------------------------------------------------------
     for col in ["temperature", "humidity", "wind_speed", "pressure"]:
         df[f"{col}_change_1"] = df[col] - df[col].shift(1)
         df[f"{col}_change_3"] = df[col] - df[col].shift(3)
 
-    return df.dropna().reset_index(drop=True)
+    # Remove rows where lag/rolling features aren't available
+    df = df.dropna().reset_index(drop=True)
 
+    return df
 
 FEATURE_COLS = [
     "temperature", "humidity", "pressure", "wind_speed", "rain",

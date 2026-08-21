@@ -41,11 +41,13 @@ h1, h2, h3, h4 {
 
 .hero-title {
     font-family: 'Outfit', sans-serif;
-    font-size: 2.15rem;
+    font-size: clamp(1.6rem, 3vw, 2.15rem);
     font-weight: 800;
     color: #f8fafc;
     letter-spacing: -0.03em;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: visible;
     display: inline-block;
     max-width: 100%;
 }

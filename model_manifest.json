@@ -1,15 +1,12 @@
 {
   "day1": {
-    "model_type": "PyTorch",
-    "kind": "pytorch",
-    "file": "aqi_model_day1.pt",
-    "scaler_file": "aqi_scaler_day1.pkl",
-    "target_mean": 100.66823630136986,
-    "target_std": 27.575564932406238,
+    "model_type": "RandomForest",
+    "kind": "sklearn",
+    "file": "aqi_model_day1.pkl",
     "is_delta": false,
-    "mae": 9.074646508906282,
-    "rmse": 11.056963290433787,
-    "r2": 0.7702654736614283,
+    "mae": 8.734731877436653,
+    "rmse": 12.679622245090581,
+    "r2": 0.8232589475490091,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day2": {
@@ -17,9 +14,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day2.pkl",
     "is_delta": true,
-    "mae": 10.965923163289743,
-    "rmse": 14.920198578320926,
-    "r2": 0.5818113550617237,
+    "mae": 15.118469546196144,
+    "rmse": 21.13268450125949,
+    "r2": 0.5080136334945148,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day3": {
@@ -27,9 +24,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day3.pkl",
     "is_delta": true,
-    "mae": 12.081550978820438,
-    "rmse": 16.58225137669078,
-    "r2": 0.4835990670413173,
+    "mae": 18.42563335084357,
+    "rmse": 24.377805821823312,
+    "r2": 0.3414964304847513,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   }
 }
