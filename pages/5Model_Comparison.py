@@ -32,12 +32,13 @@ h1, h2, h3, h4 {
 
 /* TOP SPACE — title uper se cut na ho */
 .block-container {
-    padding-top: 3.25rem !important;
+    padding-top: 5.5rem !important;
     overflow: visible !important;
 }
 
 .page-title {
     font-family: 'Outfit', sans-serif;
+    margin-top: 1.5rem !important;
     font-size: 2.2rem;
     font-weight: 800;
     color: #f8fafc;
