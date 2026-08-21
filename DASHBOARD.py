@@ -31,7 +31,7 @@ html, body, [class*="css"] {
 }
 
 .main { background: transparent; }
-.block-container { overflow: visible !important; padding-top: 1.6rem; padding-bottom: 2rem; }
+.block-container { overflow: visible !important; padding-top: 3.5rem; padding-bottom: 2rem; }
 
 h1, h2, h3, h4 {
     font-family: 'Outfit', sans-serif !important;
@@ -40,33 +40,49 @@ h1, h2, h3, h4 {
 }
 
 .hero-title {
-    font-family: 'Outfit', sans-serif;
-    font-size: clamp(1.35rem, 3.5vw, 2.1rem);
-    font-weight: 800;
-    color: #f8fafc;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: clamp(1.5rem, 3.2vw, 2.05rem) !important;
+    font-weight: 800 !important;
+    color: #f8fafc !important;
     letter-spacing: -0.02em;
-    line-height: 1.4;
+    line-height: 1.5 !important;
     white-space: normal !important;
     overflow: visible !important;
-    text-overflow: unset !important;
-    display: block;
+    text-overflow: clip !important;
+    display: inline-block !important;
     max-width: 100%;
-    word-break: break-word;
-    padding-bottom: 6px;
+    padding-top: 6px !important;
+    padding-bottom: 8px !important;
+    /* agar gradient text use ho raha ho to clip avoid */
+    -webkit-background-clip: unset !important;
+    background-clip: unset !important;
+    -webkit-text-fill-color: #f8fafc !important;
 }
 
 .hero-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.6rem 0.75rem;
-    max-width: 100%;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
     overflow: visible !important;
+    max-width: 100%;
 }
 
 .live-badge {
-    flex-shrink: 0;
-    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(52, 211, 153, 0.12);
+    border: 1px solid rgba(52, 211, 153, 0.35);
+    color: #6ee7b7;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-left: 12px;
+    vertical-align: middle;
 }
 
 .pulse-dot {
@@ -90,9 +106,7 @@ h1, h2, h3, h4 {
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     transition: border-color .25s ease, box-shadow .25s ease;
 }
-div[data-testid="stVerticalBlock"] {
-    overflow: visible !important;
-}
+
 [data-testid="stMetric"]:hover {
     border-color: rgba(52, 211, 153, 0.4);
     box-shadow: 0 0 28px rgba(52, 211, 153, 0.12);
