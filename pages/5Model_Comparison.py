@@ -29,25 +29,12 @@ h1, h2, h3, h4 {
     color: #f8fafc !important;
     letter-spacing: -0.02em;
 }
-
-/* TOP SPACE — title uper se cut na ho */
-.block-container {
-    padding-top: 5.5rem !important;
-    overflow: visible !important;
-}
-
 .page-title {
     font-family: 'Outfit', sans-serif;
-    margin-top: 1.5rem !important;
     font-size: 2.2rem;
     font-weight: 800;
     color: #f8fafc;
     letter-spacing: -0.03em;
-    line-height: 1.45;
-    padding-top: 0.35rem;
-    padding-bottom: 0.25rem;
-    overflow: visible !important;
-    display: block;
 }
 .page-sub { color: #94a3b8; font-size: 0.95rem; margin-bottom: 1rem; }
 .section-label {
@@ -77,6 +64,12 @@ section[data-testid="stSidebar"] {
 }
 </style>
 """, unsafe_allow_html=True)
+
+st.markdown('<div class="page-title">📈 Model comparison</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="page-sub">RandomForest vs Ridge vs PyTorch — cross-validated metrics per horizon</div>',
+    unsafe_allow_html=True,
+)
 
 st.markdown('<div class="page-title">📈 Model comparison</div>', unsafe_allow_html=True)
 st.markdown(
