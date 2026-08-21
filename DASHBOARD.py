@@ -433,10 +433,22 @@ st.markdown(
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_forecast():
-    backend_url = os.getenv("BACKEND_URL", "https://aqi-predictor-1-71ge.onrender.com")
-    r = requests.get(f"{backend_url}/predict")
-    return r.status_code, (r.json() if r.status_code == 200 else None)
-
+    backend_url = os.getenv(
+        "BACKEND_URL",
+        "https://aqi-predictor-1-71ge.onrender.com",
+    ).rstrip("/")
+    try:
+        # Render free tier cold-start can take 50–90s
+        r = requests.get(f"{backend_url}/predict", timeout=90)
+        try:
+            body = r.json()
+        except Exception:
+            body = {"raw": r.text[:500]}
+        return r.status_code, body
+    except requests.exceptions.Timeout:
+        return 0, {"error": "Backend timeout (Render may be waking up — wait ~1 min and refresh)"}
+    except requests.exceptions.RequestException as e:
+        return 0, {"error": f"Backend connection failed: {e}"}
 
 with st.spinner("Fetching latest forecast…"):
     status_code, payload = fetch_forecast()
@@ -756,4 +768,11 @@ Ozone {day["ozone"]}<br>
     st.caption("Karachi AQI · production-style monitoring dashboard")
 
 else:
-    st.error("Unable to fetch prediction. Is the FastAPI server running on port 8000?")
+    st.error("Unable to fetch prediction from backend.")
+    st.write(f"**HTTP status:** `{status_code}`")
+    st.write(f"**Response:** `{payload}`")
+    st.info(
+        "1) Open https://aqi-predictor-1-71ge.onrender.com/predict in browser\n\n"
+        "2) If it is slow, wait for Render wake-up, then click **Refresh forecast** in the sidebar\n\n"
+        "3) Sidebar → Refresh forecast clears cache"
+    )
