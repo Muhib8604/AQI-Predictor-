@@ -1,5 +1,7 @@
 """
 feature_snapshot.py
+Builds today's prediction features using the same feature engineering
+logic used during training.
 """
 
 import time
@@ -12,10 +14,12 @@ from weather import get_current_weather
 from aqi import get_aqicn_data
 from training_pipeline import prepare_clean_dataset, FEATURE_COLS
 
-fs = connect_feature_store()
 
 FEATURE_GROUP_NAME = "aqi_features"
 FEATURE_GROUP_VERSION = 2
+
+
+fs = connect_feature_store()
 
 feature_group = fs.get_feature_group(
     name=FEATURE_GROUP_NAME,
@@ -24,30 +28,64 @@ feature_group = fs.get_feature_group(
 
 
 def build_today_features():
+
+    # ==========================================================
+    # 1. CURRENT WEATHER
+    # ==========================================================
+
     current_weather = get_current_weather()
+
     if current_weather is None:
+        print("Unable to fetch current weather.")
         return None
 
-    # ----------------------------------------------------------
-    # Retry Hopsworks read
-    # ----------------------------------------------------------
+    # ==========================================================
+    # 2. READ HISTORICAL DATA
+    # ==========================================================
+
     history_df = None
     last_error = None
 
     for attempt in range(3):
+
         try:
             history_df = feature_group.read()
             break
+
         except Exception as e:
+
             last_error = e
-            print(f"Hopsworks read failed (attempt {attempt + 1}/3): {e}")
+
+            print(
+                f"Hopsworks read failed "
+                f"(attempt {attempt + 1}/3): {e}"
+            )
+
             time.sleep(2)
 
     if history_df is None or history_df.empty:
-        print(f"Could not read feature group after retries: {last_error}")
+
+        print(
+            f"Could not read feature group after retries: "
+            f"{last_error}"
+        )
+
         return None
 
-    history_df["aqi"] = pd.to_numeric(history_df["aqi"], errors="coerce")
+    # ==========================================================
+    # 3. CLEAN HISTORICAL AQI
+    # ==========================================================
+
+    history_df = history_df.copy()
+
+    history_df["date"] = pd.to_datetime(
+        history_df["date"]
+    )
+
+    history_df["aqi"] = pd.to_numeric(
+        history_df["aqi"],
+        errors="coerce"
+    )
 
     known_aqi_df = (
         history_df
@@ -56,54 +94,206 @@ def build_today_features():
     )
 
     if known_aqi_df.empty:
+
+        print("No historical AQI values available.")
+
         return None
 
-    # Prefer LIVE station AQI when available
-    live_aqi = None
-    try:
-        aqicn = get_aqicn_data()
-        if aqicn and aqicn.get("aqi") is not None:
-            live_aqi = float(aqicn["aqi"])
-            print(f"Using live AQICN AQI as latest reference: {live_aqi}")
-    except Exception as e:
-        print(f"Could not fetch live AQI for feature snapshot: {e}")
+    # ==========================================================
+    # 4. GET LIVE AQI
+    # ==========================================================
 
-    last_known_aqi = live_aqi if live_aqi is not None else float(known_aqi_df["aqi"].iloc[-1])
+    live_aqi = None
+
+    try:
+
+        aqicn = get_aqicn_data()
+
+        if aqicn and aqicn.get("aqi") is not None:
+
+            live_aqi = float(aqicn["aqi"])
+
+            print(
+                f"Live AQICN AQI: {live_aqi:.1f}"
+            )
+
+    except Exception as e:
+
+        print(
+            f"Could not fetch live AQI: {e}"
+        )
+
+    # ==========================================================
+    # 5. USE LIVE AQI AS TODAY'S ACTUAL AQI
+    # ==========================================================
+
+    if live_aqi is not None:
+
+        today_aqi = live_aqi
+
+    else:
+
+        today_aqi = float(
+            known_aqi_df["aqi"].iloc[-1]
+        )
+
+        print(
+            f"Live AQI unavailable. "
+            f"Using latest historical AQI: {today_aqi:.1f}"
+        )
+
+    # ==========================================================
+    # 6. BUILD TODAY'S RAW ROW
+    # ==========================================================
 
     now = datetime.now(timezone.utc)
 
     today_row = {
-        "date": now.date(),
-        "temperature": current_weather["temperature"],
-        "humidity": current_weather["humidity"],
-        "pressure": current_weather["pressure"],
-        "wind_speed": current_weather["wind_speed"],
-        "rain": current_weather["rain"],
-        "pm10": current_weather["pm10"],
-        "pm2_5": current_weather["pm25"],
-        "carbon_monoxide": current_weather["carbon_monoxide"],
-        "nitrogen_dioxide": current_weather["nitrogen_dioxide"],
-        "sulphur_dioxide": current_weather["sulphur_dioxide"],
-        "ozone": current_weather["ozone"],
-        "aqi": last_known_aqi,
+
+        "date": pd.Timestamp(
+            now.date()
+        ),
+
+        "hour": now.hour,
+
+        "temperature":
+            current_weather["temperature"],
+
+        "humidity":
+            current_weather["humidity"],
+
+        "pressure":
+            current_weather["pressure"],
+
+        "wind_speed":
+            current_weather["wind_speed"],
+
+        "rain":
+            current_weather["rain"],
+
+        "pm10":
+            current_weather["pm10"],
+
+        "pm2_5":
+            current_weather["pm25"],
+
+        "carbon_monoxide":
+            current_weather["carbon_monoxide"],
+
+        "nitrogen_dioxide":
+            current_weather["nitrogen_dioxide"],
+
+        "sulphur_dioxide":
+            current_weather["sulphur_dioxide"],
+
+        "ozone":
+            current_weather["ozone"],
+
+        "aqi":
+            today_aqi,
     }
 
+    # ==========================================================
+    # 7. APPEND TODAY TO HISTORICAL DATA
+    # ==========================================================
+
     combined_raw = pd.concat(
-        [history_df, pd.DataFrame([today_row])],
+        [
+            history_df,
+            pd.DataFrame([today_row])
+        ],
         ignore_index=True
     )
 
-    engineered = prepare_clean_dataset(combined_raw)
+    # ==========================================================
+    # 8. RUN EXACT TRAINING FEATURE ENGINEERING
+    # ==========================================================
+
+    engineered = prepare_clean_dataset(
+        combined_raw
+    )
 
     if engineered.empty:
+
+        print(
+            "Feature engineering produced no rows."
+        )
+
         return None
 
-    today_engineered = engineered.iloc[-1]
-    features = {col: today_engineered[col] for col in FEATURE_COLS}
+    # ==========================================================
+    # 9. GET THE MOST RECENT ENGINEERED ROW
+    # ==========================================================
 
-    # Keep live AQI available for caller (main.py blend)
-    features["aqi"] = last_known_aqi
+    today_engineered = engineered.iloc[-1]
+
+    # ==========================================================
+    # 10. BUILD MODEL INPUT
+    # ==========================================================
+
+    features = {}
+
+    for col in FEATURE_COLS:
+
+        value = today_engineered.get(
+            col,
+            0.0
+        )
+
+        if pd.isna(value):
+
+            value = 0.0
+
+        features[col] = float(value)
+
+    # ==========================================================
+    # 11. KEEP TODAY'S LIVE AQI SEPARATELY
+    # ==========================================================
+
+    features["aqi"] = float(
+        today_aqi
+    )
+
     if live_aqi is not None:
-        features["live_aqi"] = live_aqi
+
+        features["live_aqi"] = float(
+            live_aqi
+        )
+
+    # ==========================================================
+    # 12. DEBUG OUTPUT
+    # ==========================================================
+
+    print(
+        "\n===== TODAY FEATURE SNAPSHOT ====="
+    )
+
+    print(
+        f"Today's AQI: {today_aqi:.2f}"
+    )
+
+    print(
+        f"AQI lag 1: "
+        f"{features.get('aqi_lag_1', 0):.2f}"
+    )
+
+    print(
+        f"AQI lag 2: "
+        f"{features.get('aqi_lag_2', 0):.2f}"
+    )
+
+    print(
+        f"AQI rolling mean 3: "
+        f"{features.get('aqi_rolling_mean_3', 0):.2f}"
+    )
+
+    print(
+        f"AQI EMA 3: "
+        f"{features.get('aqi_ema_3', 0):.2f}"
+    )
+
+    print(
+        "==================================\n"
+    )
 
     return features
