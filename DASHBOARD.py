@@ -31,7 +31,7 @@ html, body, [class*="css"] {
 }
 
 .main { background: transparent; }
-.block-container { padding-top: 1.6rem; padding-bottom: 2rem; }
+.block-container { overflow: visible !important; padding-top: 1.6rem; padding-bottom: 2rem; }
 
 h1, h2, h3, h4 {
     font-family: 'Outfit', sans-serif !important;
@@ -41,39 +41,32 @@ h1, h2, h3, h4 {
 
 .hero-title {
     font-family: 'Outfit', sans-serif;
-    font-size: clamp(1.4rem, 4vw, 2.15rem);
+    font-size: clamp(1.35rem, 3.5vw, 2.1rem);
     font-weight: 800;
     color: #f8fafc;
     letter-spacing: -0.02em;
-    line-height: 1.35;
-    white-space: normal;
-    overflow: visible;
-    display: inline-block;
+    line-height: 1.4;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    display: block;
     max-width: 100%;
-    padding-bottom: 4px;
+    word-break: break-word;
+    padding-bottom: 6px;
 }
+
 .hero-row {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
-    padding-top: 0.25rem;
-    margin-bottom: 0.35rem;
+    align-items: center;
+    gap: 0.6rem 0.75rem;
+    max-width: 100%;
+    overflow: visible !important;
 }
 
 .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(52, 211, 153, 0.12);
-    border: 1px solid rgba(52, 211, 153, 0.35);
-    color: #6ee7b7;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    margin-left: 12px;
-    vertical-align: middle;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .pulse-dot {
@@ -96,6 +89,9 @@ h1, h2, h3, h4 {
     padding: 14px 16px 10px 16px;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     transition: border-color .25s ease, box-shadow .25s ease;
+}
+div[data-testid="stVerticalBlock"] {
+    overflow: visible !important;
 }
 [data-testid="stMetric"]:hover {
     border-color: rgba(52, 211, 153, 0.4);
