@@ -433,7 +433,7 @@ st.markdown(
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_forecast():
-    backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+    backend_url = os.getenv("BACKEND_URL", "https://aqi-predictor-1-71ge.onrender.com")
     r = requests.get(f"{backend_url}/predict")
     return r.status_code, (r.json() if r.status_code == 200 else None)
 
