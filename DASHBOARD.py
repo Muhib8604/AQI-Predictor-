@@ -435,7 +435,7 @@ st.markdown(
 def fetch_forecast():
     backend_url = os.getenv(
         "BACKEND_URL",
-        "https://aqi-predictor-1-71ge.onrender.com",
+        "https://aqi-predictor-api1.onrender.com",
     ).rstrip("/")
     try:
         # Render free tier cold-start can take 50–90s
@@ -772,7 +772,7 @@ else:
     st.write(f"**HTTP status:** `{status_code}`")
     st.write(f"**Response:** `{payload}`")
     st.info(
-        "1) Open https://aqi-predictor-1-71ge.onrender.com/predict in browser\n\n"
+        "1) Open https://aqi-predictor-api1.onrender.com/predict in browser\n\n"
         "2) If it is slow, wait for Render wake-up, then click **Refresh forecast** in the sidebar\n\n"
         "3) Sidebar → Refresh forecast clears cache"
     )
