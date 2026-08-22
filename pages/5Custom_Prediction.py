@@ -53,14 +53,14 @@ div[data-testid="stMetric"] { background:rgba(14,18,22,0.85); border:1px solid r
 # (not guessed lat/lon) — this is authoritative and avoids ever
 # matching a station in the wrong city/country.
 LOCATIONS = {
-    "Zafar Memon DHA": {"station_id": "545140", "area": "DHA Phase 6"},
-    "Saddar": {"station_id": "544708", "area": "Saddar Town"},
-    "Clifton": {"station_id": "547342", "area": "Clifton"},
-    "Gulshan-e-Iqbal": {"station_id": "545320", "area": "Gulshan"},
-    "North Nazimabad": {"station_id": "545017", "area": "North Nazimabad"},
-    "Korangi": {"station_id": "544699", "area": "Korangi"},
-    "Malir": {"station_id": "545422", "area": "Malir"},
-    "PECHS": {"station_id": "544681", "area": "PECHS / Tariq Road"},
+    "Zafar Memon DHA": {"station_id": "A545140", "area": "DHA Phase 6"},
+    "Saddar": {"station_id": "A544708", "area": "Saddar Town"},
+    "Clifton": {"station_id": "A547342", "area": "Clifton"},
+    "Gulshan-e-Iqbal": {"station_id": "A545320", "area": "Gulshan"},
+    "North Nazimabad": {"station_id": "A545017", "area": "North Nazimabad"},
+    "Korangi": {"station_id": "A544699", "area": "Korangi"},
+    "Malir": {"station_id": "A545422", "area": "Malir"},
+    "PECHS": {"station_id": "A544681", "area": "PECHS / Tariq Road"},
 }
 
 
