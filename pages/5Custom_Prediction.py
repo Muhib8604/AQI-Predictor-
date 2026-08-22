@@ -52,6 +52,9 @@ div[data-testid="stMetric"] { background:rgba(14,18,22,0.85); border:1px solid r
 # Karachi-area locations, resolved via their exact AQICN station IDs
 # (not guessed lat/lon) — this is authoritative and avoids ever
 # matching a station in the wrong city/country.
+#
+# IMPORTANT: these IDs keep their "A" prefix and are used as-is in the
+# URL (no "@"), matching the working pattern in this project's aqi.py.
 LOCATIONS = {
     "Zafar Memon DHA": {"station_id": "A545140", "area": "DHA Phase 6"},
     "Saddar": {"station_id": "A544708", "area": "Saddar Town"},
@@ -77,14 +80,19 @@ def fetch_station_by_id(station_id: str):
     response) so the map always matches the station, and individual
     pollutant/weather sub-readings (iaqi) so the scenario sliders below
     can default to this station's real numbers.
+
+    IMPORTANT: these station IDs (e.g. "A545140") are used AS-IS in the
+    URL, with no "@" prefix added — this matches the working format
+    already used in this project's aqi.py. Adding "@" here breaks the
+    lookup ("Unknown ID").
     """
     token = os.getenv("AQICN_API_KEY")
     if not token:
         return None, "Missing AQICN_API_KEY"
-    sid = str(station_id).lstrip("@").lstrip("Aa")
-    url = f"https://api.waqi.info/feed/@{sid}/?token={token}"
+    sid = str(station_id).strip()
+    url = f"https://api.waqi.info/feed/{sid}/"
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, params={"token": token}, timeout=10)
         r.raise_for_status()
         data = r.json()
         if data.get("status") != "ok":
