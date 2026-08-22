@@ -49,19 +49,18 @@ div[data-testid="stMetric"] { background:rgba(14,18,22,0.85); border:1px solid r
 </style>
 """, unsafe_allow_html=True)
 
-# Karachi-area locations. Station AQI is resolved live via AQICN's geo
-# endpoint (nearest online station to a lat/lon), instead of hardcoded
-# station IDs — those IDs were invalid/mismatched, which is why every
-# area used to show "offline" regardless of which one you picked.
+# Karachi-area locations, resolved via their exact AQICN station IDs
+# (not guessed lat/lon) — this is authoritative and avoids ever
+# matching a station in the wrong city/country.
 LOCATIONS = {
-    "Zafar Memon DHA": {"lat": 24.8050, "lon": 67.0450, "area": "DHA Phase 6"},
-    "Saddar": {"lat": 24.8607, "lon": 67.0011, "area": "Saddar Town"},
-    "Clifton": {"lat": 24.8138, "lon": 67.0267, "area": "Clifton"},
-    "Gulshan-e-Iqbal": {"lat": 24.9056, "lon": 67.0822, "area": "Gulshan"},
-    "North Nazimabad": {"lat": 24.9420, "lon": 67.0450, "area": "North Nazimabad"},
-    "Korangi": {"lat": 24.8500, "lon": 67.1500, "area": "Korangi"},
-    "Malir": {"lat": 24.8930, "lon": 67.1950, "area": "Malir"},
-    "PECHS": {"lat": 24.8730, "lon": 67.0620, "area": "PECHS / Tariq Road"},
+    "Zafar Memon DHA": {"station_id": "545140", "area": "DHA Phase 6"},
+    "Saddar": {"station_id": "544708", "area": "Saddar Town"},
+    "Clifton": {"station_id": "547342", "area": "Clifton"},
+    "Gulshan-e-Iqbal": {"station_id": "545320", "area": "Gulshan"},
+    "North Nazimabad": {"station_id": "545017", "area": "North Nazimabad"},
+    "Korangi": {"station_id": "544699", "area": "Korangi"},
+    "Malir": {"station_id": "545422", "area": "Malir"},
+    "PECHS": {"station_id": "544681", "area": "PECHS / Tariq Road"},
 }
 
 
@@ -70,17 +69,20 @@ def _iaqi_value(iaqi: dict, key: str):
     return entry.get("v") if isinstance(entry, dict) else None
 
 
-def fetch_station_by_geo(lat: float, lon: float):
-    """Look up the nearest live AQICN station for a lat/lon pair.
+def fetch_station_by_id(station_id: str):
+    """Fetch a specific, known-correct AQICN station by its station ID.
 
     Page-local fetch only — does not modify project pipeline modules.
-    Also returns individual pollutant/weather sub-readings (iaqi) so the
-    scenario sliders below can default to this station's real numbers.
+    Also returns the station's own reported lat/lon (from AQICN's
+    response) so the map always matches the station, and individual
+    pollutant/weather sub-readings (iaqi) so the scenario sliders below
+    can default to this station's real numbers.
     """
     token = os.getenv("AQICN_API_KEY")
     if not token:
         return None, "Missing AQICN_API_KEY"
-    url = f"https://api.waqi.info/feed/geo:{lat};{lon}/?token={token}"
+    sid = str(station_id).lstrip("@").lstrip("Aa")
+    url = f"https://api.waqi.info/feed/@{sid}/?token={token}"
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
@@ -90,12 +92,16 @@ def fetch_station_by_geo(lat: float, lon: float):
         payload = data.get("data") or {}
         aqi = payload.get("aqi")
         if aqi is None or aqi == "-":
-            return None, "No live reading nearby"
+            return None, "No live reading from this station"
         iaqi = payload.get("iaqi") or {}
-        name = (payload.get("city") or {}).get("name", "Nearest station")
+        city = payload.get("city") or {}
+        name = city.get("name", "Station")
+        geo = city.get("geo") or [None, None]
         return {
             "aqi": float(aqi),
             "name": name,
+            "lat": geo[0],
+            "lon": geo[1],
             "pm2_5": _iaqi_value(iaqi, "pm25"),
             "pm10": _iaqi_value(iaqi, "pm10"),
             "ozone": _iaqi_value(iaqi, "o3"),
@@ -124,7 +130,7 @@ with left:
     selected = st.selectbox("Area", list(LOCATIONS.keys()), index=0, label_visibility="collapsed")
     meta = LOCATIONS[selected]
 
-    live, err = fetch_station_by_geo(meta["lat"], meta["lon"])
+    live, err = fetch_station_by_id(meta["station_id"])
     if live:
         aqi_block = f'<div style="font-size:2rem;font-family:Outfit;font-weight:800;color:#34d399;">{live["aqi"]:.0f}</div><div style="color:#94a3b8;font-size:0.85rem;">Live AQI · {live["name"]}</div>'
         pill = '<span class="pill">🟢 Station online</span>'
@@ -144,7 +150,14 @@ with left:
 
 with right:
     st.markdown('<div class="section-label">🗺️ Map</div>', unsafe_allow_html=True)
-    st.map(pd.DataFrame({"lat": [meta["lat"]], "lon": [meta["lon"]]}), zoom=12)
+    # Use the station's own reported coordinates (from AQICN) if we have
+    # a live reading; otherwise fall back to a Karachi-wide view instead
+    # of a guessed pin, since we no longer hardcode per-area lat/lon.
+    if live and live.get("lat") is not None and live.get("lon") is not None:
+        map_lat, map_lon, map_zoom = live["lat"], live["lon"], 12
+    else:
+        map_lat, map_lon, map_zoom = 24.8607, 67.0011, 10  # Karachi city center
+    st.map(pd.DataFrame({"lat": [map_lat], "lon": [map_lon]}), zoom=map_zoom)
 
 st.markdown("---")
 st.markdown('<div class="section-label">🎛️ Scenario controls</div>', unsafe_allow_html=True)
