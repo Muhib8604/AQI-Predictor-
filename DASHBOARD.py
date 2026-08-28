@@ -439,7 +439,7 @@ def fetch_forecast():
     ).rstrip("/")
     try:
         # Render free tier cold-start can take 50–90s
-        r = requests.get(f"{backend_url}/predict", timeout=90)
+        r = requests.get(f"{backend_url}/predict", timeout=180)
         try:
             body = r.json()
         except Exception:
