@@ -6,19 +6,20 @@ Runs HOURLY.
 
 import os
 import sys
+import time
 import traceback
-from feature_schema import align_to_hopsworks_schema
-import numpy as np   
 from datetime import datetime, timezone
-from typing import Tuple, Optional, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 
 import hopsworks
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
-from weather import get_current_weather
 from aqi import get_aqicn_data
+from feature_schema import align_to_hopsworks_schema
 from history import load_history, update_history
+from weather import get_current_weather
 
 load_dotenv()
 
@@ -157,7 +158,7 @@ def main():
         print("\nData going into Hopsworks:")
         print(df_row[["date", "hour", "aqi"]].tail())
 
-                # ---------- ROBUST INSERT WITH RETRIES ----------
+        # ---------- ROBUST INSERT WITH RETRIES ----------
         max_retries = 3
         inserted = False
 
@@ -168,7 +169,7 @@ def main():
                 fg.insert(
                     df_row,
                     write_options={
-                        "wait_for_job": False,                  # important
+                        "wait_for_job": False,                 # important
                         "wait_for_online_ingestion": False,     # important
                     },
                 )
@@ -182,11 +183,14 @@ def main():
                 print(f"Insert attempt {attempt} failed: {e}")
 
                 if attempt < max_retries:
-                    import time
                     time.sleep(8 * attempt)   # 8s, 16s
                 else:
                     print("All insert attempts failed. Data saved only to local backup.")
                     # Do NOT sys.exit(1) — local backup already written
+
+    except Exception as e:
+        print(f"Pipeline execution failed: {e}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
