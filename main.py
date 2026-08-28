@@ -45,14 +45,19 @@ def predict():
         today_features = build_today_features()
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+
         return {
             "error": f"Feature pipeline failed: {str(e)}"
         }
 
     if today_features is None:
         return {
-            "error": "Unable to fetch current weather / features"
-        }
+            "error": "Unable to fetch current weather / features",
+            "details": str(e),
+            "type": type(e).__name__
+        } 
 
     # ========================================================
     # 3. LIVE AQI
