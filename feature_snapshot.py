@@ -50,59 +50,78 @@ def build_today_features():
     history_df = None
     last_error = None
 
+    # ==========================================================
+    # READ HISTORICAL DATA FROM HOPSWORKS
+    # ==========================================================
+
+    # First try the normal Hopsworks Feature Query Service.
+    # If its Arrow Flight connection is unavailable, fall back
+    # to Hive. Both paths still read from Hopsworks Feature Store.
+
     try:
-        fs = None
-        feature_group = None
-        last_error = None
 
-        for attempt in range(3):
-            try:
-                fs = connect_feature_store()
+        print(
+            "Trying Hopsworks Feature Query Service..."
+        )
 
-                feature_group = fs.get_feature_group(
-                    name=FEATURE_GROUP_NAME,
-                    version=FEATURE_GROUP_VERSION
-                )
+        history_df = feature_group.read(
+            read_options={
+                "arrow_flight_config": {
+                    "timeout": 900
+                }
+            }
+        )
 
-                print("Hopsworks Feature Store connected successfully.")
-                break
-
-            except Exception as e:
-                last_error = e
-
-                print(
-                    f"Hopsworks connection failed "
-                    f"(attempt {attempt + 1}/3): {e}"
-                )
-
-                if attempt < 2:
-                    time.sleep(3 * (attempt + 1))
-
-        if feature_group is None:
-            print(
-                f"Hopsworks unavailable after retries: "
-                f"{last_error}"
-            )
-            return None
+        print(
+            "Hopsworks Feature Query Service read succeeded."
+        )
 
     except Exception as e:
-        print(f"Hopsworks setup failed: {e}")
-        return None
 
         last_error = e
 
         print(
-            f"Hopsworks read failed "
-            f"(attempt {attempt + 1}/3): {e}"
+            f"Hopsworks Feature Query Service failed: {e}"
         )
 
-        time.sleep(2)
+        # ======================================================
+        # FALLBACK: HIVE
+        # ======================================================
+
+        try:
+
+            print(
+                "Falling back to Hopsworks Hive read..."
+            )
+
+            history_df = feature_group.read(
+                read_options={
+                    "use_hive": True
+                }
+            )
+
+            print(
+                "Hopsworks Hive read succeeded."
+            )
+
+        except Exception as hive_error:
+
+            last_error = hive_error
+
+            print(
+                f"Hopsworks Hive read also failed: "
+                f"{hive_error}"
+            )
+
 
     if history_df is None or history_df.empty:
 
         print(
-            f"Could not read feature group after retries: "
-            f"{last_error}"
+            "Could not read feature group from Hopsworks."
+        )
+
+        print(
+            f"Last Hopsworks error: {last_error}"
         )
 
         return None
