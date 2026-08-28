@@ -430,8 +430,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-@st.cache_data(ttl=300, show_spinner=False)
 def fetch_forecast():
     backend_url = os.getenv(
         "BACKEND_URL",
@@ -444,6 +442,9 @@ def fetch_forecast():
             body = r.json()
         except Exception:
             body = {"raw": r.text[:500]}
+        if r.status_code == 200:
+            return r.status_code, body
+
         return r.status_code, body
     except requests.exceptions.Timeout:
         return 0, {"error": "Backend timeout (Render may be waking up — wait ~1 min and refresh)"}
