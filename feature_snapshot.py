@@ -65,6 +65,7 @@ def build_today_features():
         )
 
         history_df = feature_group.read(
+            online=True,
             read_options={
                 "arrow_flight_config": {
                     "timeout": 900

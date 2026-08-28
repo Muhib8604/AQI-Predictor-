@@ -157,22 +157,36 @@ def main():
         print("\nData going into Hopsworks:")
         print(df_row[["date", "hour", "aqi"]].tail())
 
-        fg.insert(
-            df_row,
-            write_options={
-                "wait_for_job": True,
-                "wait_for_online_ingestion": True,
-            },
-        )
+                # ---------- ROBUST INSERT WITH RETRIES ----------
+        max_retries = 3
+        inserted = False
 
-        print("Feature Group insert successful.")
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"Insert attempt {attempt}/{max_retries}...")
 
-        print(f"Successfully inserted AQI={observed_aqi}")
+                fg.insert(
+                    df_row,
+                    write_options={
+                        "wait_for_job": False,                  # important
+                        "wait_for_online_ingestion": False,     # important
+                    },
+                )
 
-    except Exception:
-        print("\nFeature pipeline failed.\n")
-        traceback.print_exc()
-        sys.exit(1)
+                print("Feature Group insert successful.")
+                print(f"Successfully inserted AQI={observed_aqi}")
+                inserted = True
+                break
+
+            except Exception as e:
+                print(f"Insert attempt {attempt} failed: {e}")
+
+                if attempt < max_retries:
+                    import time
+                    time.sleep(8 * attempt)   # 8s, 16s
+                else:
+                    print("All insert attempts failed. Data saved only to local backup.")
+                    # Do NOT sys.exit(1) — local backup already written
 
 
 if __name__ == "__main__":

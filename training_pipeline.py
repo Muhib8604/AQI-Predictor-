@@ -444,8 +444,71 @@ def main():
         version=FEATURE_GROUP_VERSION
     )
 
-    # Read the data
-    df_raw = feature_group.read()
+    # ========================================================
+    # ROBUST HOPSWORKS READ
+    # Feature Query Service retries + Hive fallback
+    # ========================================================
+    df_raw = None
+    last_error = None
+
+    for attempt in range(1, 4):
+        try:
+            print(
+                f"Read attempt {attempt}/3 "
+                f"(Feature Query Service)..."
+            )
+
+            df_raw = feature_group.read(
+                read_options={
+                    "arrow_flight_config": {
+                        "timeout": 90
+                    }
+                }
+            )
+
+            print("Feature Query Service read succeeded.")
+            break
+
+        except Exception as e:
+            last_error = e
+            print(f"Attempt {attempt} failed: {e}")
+
+            if attempt < 3:
+                import time
+                wait_time = 10 * attempt
+                print(
+                    f"Waiting {wait_time} seconds before retry..."
+                )
+                time.sleep(wait_time)
+
+    # ========================================================
+    # HIVE FALLBACK
+    # ========================================================
+    if df_raw is None:
+        try:
+            print("Falling back to Hive read...")
+
+            df_raw = feature_group.read(
+                read_options={
+                    "use_hive": True
+                }
+            )
+
+            print("Hive read succeeded.")
+
+        except Exception as hive_err:
+            last_error = hive_err
+            print(f"Hive also failed: {hive_err}")
+
+    # ========================================================
+    # FINAL SAFETY CHECK
+    # ========================================================
+    if df_raw is None or df_raw.empty:
+        raise RuntimeError(
+            "Could not read feature group after "
+            f"retries and Hive fallback. "
+            f"Last error: {last_error}"
+        )
 
     raw_row_count = len(df_raw)
 
