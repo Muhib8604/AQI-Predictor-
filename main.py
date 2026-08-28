@@ -24,7 +24,13 @@ def predict():
     #    Display information only
     # ========================================================
 
-    weather_forecast = get_openweather_data()
+    try:
+        weather_forecast = get_openweather_data()
+
+    except Exception as e:
+        return {
+            "error": f"Weather API failed: {str(e)}"
+        }
 
     if weather_forecast is None:
         return {
@@ -35,7 +41,13 @@ def predict():
     # 2. TODAY'S MODEL FEATURE SNAPSHOT
     # ========================================================
 
-    today_features = build_today_features()
+    try:
+        today_features = build_today_features()
+
+    except Exception as e:
+        return {
+            "error": f"Feature pipeline failed: {str(e)}"
+        }
 
     if today_features is None:
         return {
@@ -46,7 +58,11 @@ def predict():
     # 3. LIVE AQI
     # ========================================================
 
-    live = get_aqicn_data()
+    try:
+        live = get_aqicn_data()
+    except Exception as e:
+        print(f"Live AQI fetch failed: {e}")
+        live = None
 
     live_aqi = None
     live_station_name = None

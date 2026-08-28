@@ -19,20 +19,24 @@ FEATURE_GROUP_NAME = "aqi_features"
 FEATURE_GROUP_VERSION = 2
 
 
-fs = connect_feature_store()
-
-feature_group = fs.get_feature_group(
-    name=FEATURE_GROUP_NAME,
-    version=FEATURE_GROUP_VERSION
-)
-
 
 def build_today_features():
 
     # ==========================================================
     # 1. CURRENT WEATHER
     # ==========================================================
+    try:
+        fs = connect_feature_store()
 
+        feature_group = fs.get_feature_group(
+            name=FEATURE_GROUP_NAME,
+            version=FEATURE_GROUP_VERSION
+        )
+
+    except Exception as e:
+        print(f"Hopsworks connection failed: {e}")
+        return None
+    
     current_weather = get_current_weather()
 
     if current_weather is None:
@@ -46,22 +50,53 @@ def build_today_features():
     history_df = None
     last_error = None
 
-    for attempt in range(3):
+    try:
+        fs = None
+        feature_group = None
+        last_error = None
 
-        try:
-            history_df = feature_group.read()
-            break
+        for attempt in range(3):
+            try:
+                fs = connect_feature_store()
 
-        except Exception as e:
+                feature_group = fs.get_feature_group(
+                    name=FEATURE_GROUP_NAME,
+                    version=FEATURE_GROUP_VERSION
+                )
 
-            last_error = e
+                print("Hopsworks Feature Store connected successfully.")
+                break
 
+            except Exception as e:
+                last_error = e
+
+                print(
+                    f"Hopsworks connection failed "
+                    f"(attempt {attempt + 1}/3): {e}"
+                )
+
+                if attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+
+        if feature_group is None:
             print(
-                f"Hopsworks read failed "
-                f"(attempt {attempt + 1}/3): {e}"
+                f"Hopsworks unavailable after retries: "
+                f"{last_error}"
             )
+            return None
 
-            time.sleep(2)
+    except Exception as e:
+        print(f"Hopsworks setup failed: {e}")
+        return None
+
+        last_error = e
+
+        print(
+            f"Hopsworks read failed "
+            f"(attempt {attempt + 1}/3): {e}"
+        )
+
+        time.sleep(2)
 
     if history_df is None or history_df.empty:
 
