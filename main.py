@@ -54,9 +54,7 @@ def predict():
 
     if today_features is None:
         return {
-            "error": "Unable to fetch current weather / features",
-            "details": str(e),
-            "type": type(e).__name__
+            "error": "Unable to build today's feature snapshot"
         } 
 
     # ========================================================

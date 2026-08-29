@@ -67,8 +67,9 @@ def build_today_features():
         history_df = feature_group.read(
             online=True,
             read_options={
+                "external": True,
                 "arrow_flight_config": {
-                    "timeout": 900
+                    "timeout": 30
                 }
             }
         )
@@ -85,35 +86,7 @@ def build_today_features():
             f"Hopsworks Feature Query Service failed: {e}"
         )
 
-        # ======================================================
-        # FALLBACK: HIVE
-        # ======================================================
-
-        try:
-
-            print(
-                "Falling back to Hopsworks Hive read..."
-            )
-
-            history_df = feature_group.read(
-                read_options={
-                    "use_hive": True
-                }
-            )
-
-            print(
-                "Hopsworks Hive read succeeded."
-            )
-
-        except Exception as hive_error:
-
-            last_error = hive_error
-
-            print(
-                f"Hopsworks Hive read also failed: "
-                f"{hive_error}"
-            )
-
+        history_df = None
 
     if history_df is None or history_df.empty:
 
