@@ -19,10 +19,7 @@ def home():
 @app.get("/predict")
 def predict():
 
-    # ========================================================
-    # 1. 3-DAY WEATHER FORECAST
-    #    Display information only
-    # ========================================================
+    
 
     try:
         weather_forecast = get_openweather_data()
@@ -37,10 +34,7 @@ def predict():
             "error": "Unable to fetch weather forecast"
         }
 
-    # ========================================================
-    # 2. TODAY'S MODEL FEATURE SNAPSHOT
-    # ========================================================
-
+    
     try:
         today_features = build_today_features()
 
@@ -57,10 +51,7 @@ def predict():
             "error": "Unable to build today's feature snapshot"
         } 
 
-    # ========================================================
-    # 3. LIVE AQI
-    # ========================================================
-
+    
     try:
         live = get_aqicn_data()
     except Exception as e:
@@ -79,27 +70,12 @@ def predict():
         except (TypeError, ValueError):
             live_aqi = None
 
-    # ========================================================
-    # 4. PUT LIVE AQI INTO THE FEATURE SNAPSHOT
-    # ========================================================
-    #
-    # This is important.
-    #
-    # The model should know today's actual AQI.
-    # The feature_snapshot module is responsible for creating
-    # the historical lag/rolling features.
-    #
-    # We only override today's observed AQI here if AQICN
-    # returned a valid live value.
-    # ========================================================
+    
 
     if live_aqi is not None:
         today_features["aqi"] = live_aqi
 
-    # ========================================================
-    # 5. RUN THE 3 HORIZON MODELS
-    # ========================================================
-
+    
     try:
 
         horizon_results = predict_all_horizons(
@@ -112,10 +88,7 @@ def predict():
             "error": str(e)
         }
 
-    # ========================================================
-    # 6. BUILD DISPLAY PREDICTIONS
-    # ========================================================
-
+    
     horizon_keys = [
         "day1",
         "day2",
@@ -162,10 +135,7 @@ def predict():
                 day["sulphur_dioxide"],
         })
 
-    # ========================================================
-    # 7. FINAL RESPONSE
-    # ========================================================
-
+    
     return {
 
         "3_day_AQI_forecast": predictions,

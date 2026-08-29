@@ -139,9 +139,7 @@ def main():
         print("\nFinal dataframe:")
         print(df_row)
 
-        # Important: Do NOT call append_features on a brand new FG.
-        # First insert will create the schema automatically.
-        # Make sure AQI is populated BEFORE this point
+        
         df_row["aqi"] = pd.to_numeric(df_row["aqi"], errors="coerce")
 
         for col in [

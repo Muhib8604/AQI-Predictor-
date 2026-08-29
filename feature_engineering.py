@@ -23,9 +23,7 @@ df["day_of_week"] = df["date"].dt.day_name()
 
 print(df[["date", "year", "month", "day", "day_of_week"]].head(10))
 
-# ============================================
-# Create AQI Lag Feature
-# ============================================
+
 
 df["aqi_lag_1"] = df["aqi"].shift(1)
 
@@ -43,9 +41,7 @@ df = df.dropna()
 
 print(df[["date", "aqi", "aqi_lag_1"]].head())
 
-# ============================================
-# Create 3-Day Rolling Average
-# ============================================
+
 
 df["aqi_rolling_mean_3"] = (
     df["aqi"]
@@ -64,9 +60,7 @@ print(
     ].head(10)
 )
 
-# ============================================
-# AQI Change Rate
-# ============================================
+
 
 df["aqi_change"] = df["aqi"].diff()
 
@@ -82,9 +76,6 @@ print(
     ].head(10)
 )
 
-# ============================================
-# Convert Day of Week into Numbers
-# ============================================
 
 
 
@@ -94,9 +85,7 @@ df["day_of_week"] = encoder.fit_transform(df["day_of_week"])
 
 print(df[["date", "day_of_week"]].head(10))
 
-# ============================================
-# Features (X) and Target (y)
-# ============================================
+
 
 df = df.dropna()
 

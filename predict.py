@@ -1,8 +1,4 @@
-"""
-predict.py
 
-Day 1/2/3 predictions with live-AQI anchoring.
-"""
 
 import os
 import json
@@ -120,9 +116,7 @@ def predict_all_horizons(features: dict):
     if live_aqi is not None:
         live_aqi = float(live_aqi)
 
-    # ======================================================
-    # REQUIRED FEATURES
-    # ======================================================
+    
 
     row = {}
 
@@ -135,10 +129,7 @@ def predict_all_horizons(features: dict):
 
         row[col] = float(features[col])
 
-    # ======================================================
-    # RAW MODEL PREDICTIONS
-    # ======================================================
-
+    
     df = pd.DataFrame(
         [row]
     )[_FEATURE_COLUMNS]
@@ -173,10 +164,7 @@ def predict_all_horizons(features: dict):
         else raw_day3_delta
     )
 
-    # ======================================================
-    # LIVE AQI ANCHOR
-    # ======================================================
-
+    
     if live_aqi is not None:
 
         # Day 1 gets the strongest correction.
@@ -210,9 +198,7 @@ def predict_all_horizons(features: dict):
         pred_day2 = raw_day2
         pred_day3 = raw_day3
 
-    # ======================================================
-    # SAFETY LIMITS
-    # ======================================================
+    
 
     pred_day1 = max(0.0, pred_day1)
     pred_day2 = max(0.0, pred_day2)

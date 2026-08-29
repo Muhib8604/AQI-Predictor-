@@ -5,9 +5,7 @@ import seaborn as sns
 # Load dataset
 df = pd.read_csv("training_dataset.csv")
 
-# ----------------------------
-# DATASET OVERVIEW
-# ----------------------------
+
 
 print("=" * 50)
 print("DATASET SHAPE")
@@ -35,9 +33,7 @@ print("MISSING VALUES")
 print("=" * 50)
 print(df.isnull().sum())
 
-# ----------------------------
-# TARGET DISTRIBUTION
-# ----------------------------
+
 
 plt.figure(figsize=(8,5))
 sns.histplot(df["aqi"], bins=30, kde=True)
@@ -49,9 +45,7 @@ sns.boxplot(y=df["aqi"])
 plt.title("AQI Boxplot")
 plt.show()
 
-# ----------------------------
-# CORRELATION HEATMAP
-# ----------------------------
+
 
 plt.figure(figsize=(14,10))
 
@@ -64,9 +58,6 @@ sns.heatmap(
 plt.title("Correlation Heatmap")
 plt.show()
 
-# ----------------------------
-# FEATURE DISTRIBUTIONS
-# ----------------------------
 
 features = [
 
@@ -89,9 +80,6 @@ for feature in features:
 
     plt.show()
 
-# ----------------------------
-# AQI VS FEATURES
-# ----------------------------
 
 compare = [
 
@@ -116,9 +104,7 @@ for feature in compare:
 
     plt.show()
 
-# ----------------------------
-# AQI OVER TIME
-# ----------------------------
+
 
 if "date" in df.columns:
 
@@ -135,9 +121,7 @@ if "date" in df.columns:
 
     plt.show()
 
-# ----------------------------
-# OUTLIERS
-# ----------------------------
+
 
 plt.figure(figsize=(10,5))
 

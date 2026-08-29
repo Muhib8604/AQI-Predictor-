@@ -6,14 +6,10 @@ from datetime import datetime, timezone
 
 load_dotenv()
 
-# Shared settings for every external OpenWeather call. A short timeout
-# means a slow/stuck request fails fast instead of hanging the whole
-# /predict request; retries absorb the occasional transient blip
-# (brief rate-limit, DNS hiccup, momentary 5xx) that used to cause a
-# random-looking failure even though nothing in the code had changed.
-REQUEST_TIMEOUT = 10          # seconds per attempt
+
+REQUEST_TIMEOUT = 10          
 MAX_RETRIES = 3
-RETRY_BACKOFF_SECONDS = 2     # wait between attempts, doubles each retry
+RETRY_BACKOFF_SECONDS = 2     
 
 
 def _get_with_retry(url, params, what: str):

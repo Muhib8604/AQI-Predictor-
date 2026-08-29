@@ -1,19 +1,4 @@
-"""
-training_pipeline.py — Chained Autoregressive Tournament (v5.2, restored)
-Clean version – no warning spam, reasonable speed
 
-RESTORED after a git rebase accidentally reverted this file to a very old,
-single-RandomForest, no-Hopsworks, no-__main__-guard script. This is the
-real version: RF/Ridge/PyTorch tournament per horizon, honest recursive
-chaining (day2/day3 score against the upstream model's own out-of-fold
-predictions, never ground truth), reads from the Hopsworks feature store.
-
-Includes the prev_aqi leakage fix: prev_aqi is used ONLY to define the
-correct training target for day2/day3 (true_level - prev_actual) — it is
-NOT a model input feature, and reconstruction/evaluation uses base_pred
-(the upstream model's own predicted level via upstream_oof_level_by_date),
-never the true prev_aqi value.
-"""
 
 import os
 os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
@@ -68,9 +53,7 @@ def recency_weights(dates, half_life_days=75):
     dates = pd.to_datetime(dates)
     age_days = (dates.max() - dates).dt.days.astype(float)
     return np.exp(-np.log(2) * age_days / half_life_days)
-# ============================================================
-# 1. FEATURE ENGINEERING
-# ============================================================
+
 def prepare_clean_dataset(df_raw):
 
     # Make a working copy BEFORE using df
@@ -94,11 +77,7 @@ def prepare_clean_dataset(df_raw):
     # Daily aggregation
     df = df.resample("D").mean(numeric_only=True)
 
-    # --------------------------------------------------------
-    # IMPORTANT:
-    # Never interpolate AQI.
-    # AQI must come from an actual station observation.
-    # --------------------------------------------------------
+    
     df = df.dropna(subset=["aqi"])
 
     # Interpolate/fill only non-target features
@@ -123,9 +102,7 @@ def prepare_clean_dataset(df_raw):
 
     df = df.reset_index()
 
-    # --------------------------------------------------------
-    # Calendar features
-    # --------------------------------------------------------
+    
     df["month"] = df["date"].dt.month
     df["day"] = df["date"].dt.day
     df["day_of_week"] = df["date"].dt.dayofweek
@@ -137,9 +114,7 @@ def prepare_clean_dataset(df_raw):
     df["dow_sin"] = np.sin(2 * np.pi * df["day_of_week"] / 7)
     df["dow_cos"] = np.cos(2 * np.pi * df["day_of_week"] / 7)
 
-    # --------------------------------------------------------
-    # AQI lag features
-    # --------------------------------------------------------
+    
     for lag in [1, 2, 3, 5, 7, 14]:
         df[f"aqi_lag_{lag}"] = df["aqi"].shift(lag)
 
@@ -161,16 +136,12 @@ def prepare_clean_dataset(df_raw):
     df["aqi_change_3"] = df["aqi_lag_1"] - df["aqi_lag_3"]
     df["aqi_change_7"] = df["aqi_lag_1"] - df["aqi_lag_7"]
 
-    # --------------------------------------------------------
-    # Pollutant lag/change features
-    # --------------------------------------------------------
+    
     for col in ["pm2_5", "pm10", "ozone", "nitrogen_dioxide"]:
         df[f"{col}_lag_1"] = df[col].shift(1)
         df[f"{col}_change_1"] = df[col] - df[col].shift(1)
 
-    # --------------------------------------------------------
-    # Weather change features
-    # --------------------------------------------------------
+    
     for col in ["temperature", "humidity", "wind_speed", "pressure"]:
         df[f"{col}_change_1"] = df[col] - df[col].shift(1)
         df[f"{col}_change_3"] = df[col] - df[col].shift(3)
@@ -209,9 +180,7 @@ def _pooled_metrics(actuals, preds):
     }
 
 
-# ============================================================
-# 2. MODEL TRAINERS
-# ============================================================
+
 def train_random_forest(X, y_target, y_true_level, base_pred, eval_mask, is_delta, sample_weight):
     param_grid = {
         "n_estimators":     [200, 300],
@@ -348,9 +317,6 @@ def train_pytorch(X, y_target, y_true_level, base_pred, eval_mask, is_delta, sam
             best["metrics"], best["oof_level"], best["params"])
 
 
-# ============================================================
-# 3. TOURNAMENT
-# ============================================================
 def run_tournament_for_horizon(daily_df, horizon_name, h, upstream_oof_level_by_date):
     print(f"\n=== Tournament for {horizon_name} (AQI {h} day(s) ahead) ===")
 
@@ -444,10 +410,7 @@ def main():
         version=FEATURE_GROUP_VERSION
     )
 
-    # ========================================================
-    # ROBUST HOPSWORKS READ
-    # Feature Query Service retries + Hive fallback
-    # ========================================================
+    
     df_raw = None
     last_error = None
 
@@ -481,9 +444,7 @@ def main():
                 )
                 time.sleep(wait_time)
 
-    # ========================================================
-    # HIVE FALLBACK
-    # ========================================================
+    
     if df_raw is None:
         try:
             print("Falling back to Hive read...")
@@ -500,9 +461,7 @@ def main():
             last_error = hive_err
             print(f"Hive also failed: {hive_err}")
 
-    # ========================================================
-    # FINAL SAFETY CHECK
-    # ========================================================
+    
     if df_raw is None or df_raw.empty:
         raise RuntimeError(
             "Could not read feature group after "

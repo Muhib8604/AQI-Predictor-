@@ -1,8 +1,4 @@
-"""
-feature_snapshot.py
-Builds today's prediction features using the same feature engineering
-logic used during training.
-"""
+
 
 import time
 from datetime import datetime, timezone
@@ -22,9 +18,7 @@ FEATURE_GROUP_VERSION = 2
 
 def build_today_features():
 
-    # ==========================================================
-    # 1. CURRENT WEATHER
-    # ==========================================================
+    
     try:
         fs = connect_feature_store()
 
@@ -43,20 +37,12 @@ def build_today_features():
         print("Unable to fetch current weather.")
         return None
 
-    # ==========================================================
-    # 2. READ HISTORICAL DATA
-    # ==========================================================
+    
 
     history_df = None
     last_error = None
 
-    # ==========================================================
-    # READ HISTORICAL DATA FROM HOPSWORKS
-    # ==========================================================
-
-    # First try the normal Hopsworks Feature Query Service.
-    # If its Arrow Flight connection is unavailable, fall back
-    # to Hive. Both paths still read from Hopsworks Feature Store.
+    
 
     try:
 
@@ -100,9 +86,7 @@ def build_today_features():
 
         return None
 
-    # ==========================================================
-    # 3. CLEAN HISTORICAL AQI
-    # ==========================================================
+    
 
     history_df = history_df.copy()
 
@@ -127,9 +111,7 @@ def build_today_features():
 
         return None
 
-    # ==========================================================
-    # 4. GET LIVE AQI
-    # ==========================================================
+    
 
     live_aqi = None
 
@@ -151,10 +133,7 @@ def build_today_features():
             f"Could not fetch live AQI: {e}"
         )
 
-    # ==========================================================
-    # 5. USE LIVE AQI AS TODAY'S ACTUAL AQI
-    # ==========================================================
-
+    
     if live_aqi is not None:
 
         today_aqi = live_aqi
@@ -170,9 +149,7 @@ def build_today_features():
             f"Using latest historical AQI: {today_aqi:.1f}"
         )
 
-    # ==========================================================
-    # 6. BUILD TODAY'S RAW ROW
-    # ==========================================================
+    
 
     now = datetime.now(timezone.utc)
 
@@ -221,10 +198,7 @@ def build_today_features():
             today_aqi,
     }
 
-    # ==========================================================
-    # 7. APPEND TODAY TO HISTORICAL DATA
-    # ==========================================================
-
+    
     combined_raw = pd.concat(
         [
             history_df,
@@ -233,10 +207,7 @@ def build_today_features():
         ignore_index=True
     )
 
-    # ==========================================================
-    # 8. RUN EXACT TRAINING FEATURE ENGINEERING
-    # ==========================================================
-
+    
     engineered = prepare_clean_dataset(
         combined_raw
     )
@@ -249,16 +220,11 @@ def build_today_features():
 
         return None
 
-    # ==========================================================
-    # 9. GET THE MOST RECENT ENGINEERED ROW
-    # ==========================================================
+    
 
     today_engineered = engineered.iloc[-1]
 
-    # ==========================================================
-    # 10. BUILD MODEL INPUT
-    # ==========================================================
-
+    
     features = {}
 
     for col in FEATURE_COLS:
@@ -274,10 +240,7 @@ def build_today_features():
 
         features[col] = float(value)
 
-    # ==========================================================
-    # 11. KEEP TODAY'S LIVE AQI SEPARATELY
-    # ==========================================================
-
+    
     features["aqi"] = float(
         today_aqi
     )
@@ -288,9 +251,7 @@ def build_today_features():
             live_aqi
         )
 
-    # ==========================================================
-    # 12. DEBUG OUTPUT
-    # ==========================================================
+    
 
     print(
         "\n===== TODAY FEATURE SNAPSHOT ====="

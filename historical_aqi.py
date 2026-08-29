@@ -1,17 +1,13 @@
 import pandas as pd
 
-# ============================================
-# Load Historical AQI Dataset
-# ============================================
+
 
 aqi_df = pd.read_csv(
     "air_quality_historical.csv",
     sep="\t"
 )
 
-# ============================================
-# Display Original Dataset Information
-# ============================================
+
 
 print("Original Dataset:")
 print(aqi_df.head())
@@ -22,15 +18,11 @@ print(aqi_df.columns.tolist())
 print("\nOriginal Shape:")
 print(aqi_df.shape)
 
-# ============================================
-# Remove rows where AQI is missing
-# ============================================
+
 
 aqi_df = aqi_df.dropna(subset=["us_aqi"])
 
-# ============================================
-# Keep only the columns required for training
-# ============================================
+
 
 aqi_df = aqi_df[
     [
@@ -53,9 +45,6 @@ aqi_df = aqi_df.rename(
 )
 
 
-# ============================================
-# Display Clean Dataset
-# ============================================
 
 print("\nCleaned Dataset:")
 print(aqi_df.head())
@@ -63,9 +52,7 @@ print(aqi_df.head())
 print("\nCleaned Shape:")
 print(aqi_df.shape)
 
-# ============================================
-# Save Clean Dataset
-# ============================================
+
 
 aqi_df.to_csv(
     "historical_aqi_clean.csv",
