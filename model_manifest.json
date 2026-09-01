@@ -4,9 +4,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day1.pkl",
     "is_delta": false,
-    "mae": 8.925948179323592,
-    "rmse": 13.084960736316608,
-    "r2": 0.8175653485410588,
+    "mae": 8.998260768324702,
+    "rmse": 13.19707479421883,
+    "r2": 0.8163961821539116,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day2": {
@@ -14,9 +14,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day2.pkl",
     "is_delta": true,
-    "mae": 14.049056324765651,
-    "rmse": 20.46645891464627,
-    "r2": 0.5542695093476797,
+    "mae": 14.03015550533253,
+    "rmse": 20.413854985532307,
+    "r2": 0.558217800212351,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   },
   "day3": {
@@ -24,9 +24,9 @@
     "kind": "sklearn",
     "file": "aqi_model_day3.pkl",
     "is_delta": true,
-    "mae": 16.452791725160615,
-    "rmse": 23.106685592527217,
-    "r2": 0.430669021688154,
+    "mae": 16.406476669750916,
+    "rmse": 22.951441507541297,
+    "r2": 0.43686243418273085,
     "evaluation": "Day1 = absolute. Day2/3 = residual + prev_aqi feature. All rows used. Metrics on reconstructed absolute AQI."
   }
 }
